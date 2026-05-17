@@ -3,11 +3,6 @@ services:
     build: honeypot
     image: ghcr.io/maede97/honeypot:latest
     restart: always
-    environment:
-      HONEYPOT_DB_PATH: /data/honeypot.db
-      RETENTION_DAYS: ${RETENTION_DAYS:-7}
-      RETENTION_SCHEDULE_HOUR: ${RETENTION_SCHEDULE_HOUR:-0}
-      RETENTION_SCHEDULE_MINUTE: ${RETENTION_SCHEDULE_MINUTE:-30}
     env_file:
       - .env
     volumes:
@@ -24,11 +19,6 @@ services:
     build: honeypot-gui
     image: ghcr.io/maede97/honeypot-gui:latest
     restart: always
-    environment:
-      HONEYPOT_DB_PATH: /data/honeypot.db
-      GUI_ADMIN_USERNAME: ${GUI_ADMIN_USERNAME}
-      GUI_ADMIN_PASSWORD_BCRYPT: ${GUI_ADMIN_PASSWORD_BCRYPT}
-      GUI_SESSION_SECRET: ${GUI_SESSION_SECRET}
     env_file:
       - .env
     volumes:
