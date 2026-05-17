@@ -32,6 +32,8 @@ class WebhookRow:
     interval_seconds: int
     filter_method: str
     body_size_gt_zero: bool
+    burst_packets: int
+    burst_window_seconds: int
     filter_field: str
     filter_operator: str
     filter_value: str
@@ -82,6 +84,8 @@ class WebhookStore:
                     interval_seconds INTEGER NOT NULL,
                     filter_method TEXT NOT NULL DEFAULT '',
                     body_size_gt_zero INTEGER NOT NULL DEFAULT 0,
+                    burst_packets INTEGER NOT NULL DEFAULT 0,
+                    burst_window_seconds INTEGER NOT NULL DEFAULT 0,
                     filter_field TEXT NOT NULL DEFAULT '',
                     filter_operator TEXT NOT NULL DEFAULT 'equals',
                     filter_value TEXT NOT NULL DEFAULT '',
@@ -99,11 +103,17 @@ class WebhookStore:
             columns = conn.execute("PRAGMA table_info(webhooks)").fetchall()
             has_filter_method = any(str(row["name"]) == "filter_method" for row in columns)
             has_body_size_gt_zero = any(str(row["name"]) == "body_size_gt_zero" for row in columns)
+            has_burst_packets = any(str(row["name"]) == "burst_packets" for row in columns)
+            has_burst_window_seconds = any(str(row["name"]) == "burst_window_seconds" for row in columns)
             has_filter_operator = any(str(row["name"]) == "filter_operator" for row in columns)
             if not has_filter_method:
                 conn.execute("ALTER TABLE webhooks ADD COLUMN filter_method TEXT NOT NULL DEFAULT ''")
             if not has_body_size_gt_zero:
                 conn.execute("ALTER TABLE webhooks ADD COLUMN body_size_gt_zero INTEGER NOT NULL DEFAULT 0")
+            if not has_burst_packets:
+                conn.execute("ALTER TABLE webhooks ADD COLUMN burst_packets INTEGER NOT NULL DEFAULT 0")
+            if not has_burst_window_seconds:
+                conn.execute("ALTER TABLE webhooks ADD COLUMN burst_window_seconds INTEGER NOT NULL DEFAULT 0")
             if not has_filter_operator:
                 conn.execute("ALTER TABLE webhooks ADD COLUMN filter_operator TEXT NOT NULL DEFAULT 'equals'")
             conn.commit()
@@ -117,6 +127,8 @@ class WebhookStore:
             interval_seconds=int(row["interval_seconds"]),
             filter_method=str(row["filter_method"]) if "filter_method" in row.keys() else "",
             body_size_gt_zero=bool(row["body_size_gt_zero"]) if "body_size_gt_zero" in row.keys() else False,
+            burst_packets=int(row["burst_packets"]) if "burst_packets" in row.keys() else 0,
+            burst_window_seconds=int(row["burst_window_seconds"]) if "burst_window_seconds" in row.keys() else 0,
             filter_field=str(row["filter_field"]),
             filter_operator=str(row["filter_operator"]) if "filter_operator" in row.keys() else "equals",
             filter_value=str(row["filter_value"]),
@@ -134,7 +146,7 @@ class WebhookStore:
             rows = conn.execute(
                 """
                   SELECT id, name, target_url, enabled, interval_seconds, filter_field, filter_value,
-                      filter_method, body_size_gt_zero, filter_operator,
+                                            filter_method, body_size_gt_zero, burst_packets, burst_window_seconds, filter_operator,
                        payload_template, last_scan_id, last_run_at, last_response_status, last_error,
                        created_at, updated_at
                 FROM webhooks
@@ -148,7 +160,7 @@ class WebhookStore:
             row = conn.execute(
                 """
                   SELECT id, name, target_url, enabled, interval_seconds, filter_field, filter_value,
-                      filter_method, body_size_gt_zero, filter_operator,
+                                            filter_method, body_size_gt_zero, burst_packets, burst_window_seconds, filter_operator,
                        payload_template, last_scan_id, last_run_at, last_response_status, last_error,
                        created_at, updated_at
                 FROM webhooks
@@ -169,6 +181,8 @@ class WebhookStore:
         interval_seconds: int,
         filter_method: str,
         body_size_gt_zero: bool,
+        burst_packets: int,
+        burst_window_seconds: int,
         filter_field: str,
         filter_operator: str,
         filter_value: str,
@@ -185,6 +199,8 @@ class WebhookStore:
                     interval_seconds,
                     filter_method,
                     body_size_gt_zero,
+                    burst_packets,
+                    burst_window_seconds,
                     filter_field,
                     filter_operator,
                     filter_value,
@@ -192,7 +208,7 @@ class WebhookStore:
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     name,
@@ -201,6 +217,8 @@ class WebhookStore:
                     interval_seconds,
                     filter_method,
                     1 if body_size_gt_zero else 0,
+                    burst_packets,
+                    burst_window_seconds,
                     filter_field,
                     filter_operator,
                     filter_value,
@@ -222,6 +240,8 @@ class WebhookStore:
         interval_seconds: int,
         filter_method: str,
         body_size_gt_zero: bool,
+        burst_packets: int,
+        burst_window_seconds: int,
         filter_field: str,
         filter_operator: str,
         filter_value: str,
@@ -238,6 +258,8 @@ class WebhookStore:
                     interval_seconds = ?,
                     filter_method = ?,
                     body_size_gt_zero = ?,
+                    burst_packets = ?,
+                    burst_window_seconds = ?,
                     filter_field = ?,
                     filter_operator = ?,
                     filter_value = ?,
@@ -252,6 +274,8 @@ class WebhookStore:
                     interval_seconds,
                     filter_method,
                     1 if body_size_gt_zero else 0,
+                    burst_packets,
+                    burst_window_seconds,
                     filter_field,
                     filter_operator,
                     filter_value,
@@ -348,6 +372,8 @@ class WebhookDispatcher:
                 after_scan_id=webhook.last_scan_id,
                 filter_method=webhook.filter_method,
                 body_size_gt_zero=webhook.body_size_gt_zero,
+                burst_packets=webhook.burst_packets,
+                burst_window_seconds=webhook.burst_window_seconds,
                 filter_field=webhook.filter_field,
                 filter_operator=webhook.filter_operator,
                 filter_value=webhook.filter_value,
@@ -388,6 +414,8 @@ class WebhookDispatcher:
         payload_template: str,
         filter_method: str,
         body_size_gt_zero: bool,
+        burst_packets: int,
+        burst_window_seconds: int,
         filter_field: str,
         filter_operator: str,
         filter_value: str,
@@ -397,6 +425,8 @@ class WebhookDispatcher:
             payload_template=payload_template,
             filter_method=filter_method,
             body_size_gt_zero=body_size_gt_zero,
+            burst_packets=burst_packets,
+            burst_window_seconds=burst_window_seconds,
             filter_field=filter_field,
             filter_operator=filter_operator,
             filter_value=filter_value,
@@ -458,6 +488,8 @@ class WebhookDispatcher:
         payload_template: str,
         filter_method: str,
         body_size_gt_zero: bool,
+        burst_packets: int,
+        burst_window_seconds: int,
         filter_field: str,
         filter_operator: str,
         filter_value: str,
@@ -466,6 +498,8 @@ class WebhookDispatcher:
             after_scan_id=0,
             filter_method=filter_method,
             body_size_gt_zero=body_size_gt_zero,
+            burst_packets=burst_packets,
+            burst_window_seconds=burst_window_seconds,
             filter_field=filter_field,
             filter_operator=filter_operator,
             filter_value=filter_value,
@@ -520,6 +554,8 @@ class WebhookDispatcher:
         after_scan_id: int,
         filter_method: str,
         body_size_gt_zero: bool,
+        burst_packets: int,
+        burst_window_seconds: int,
         filter_field: str,
         filter_operator: str,
         filter_value: str,
@@ -547,24 +583,41 @@ class WebhookDispatcher:
                 params.append(filter_value_clean)
 
         where_sql = " AND ".join(where_parts)
+
+        normalized_burst_packets = max(0, int(burst_packets))
+        normalized_burst_window = max(0, int(burst_window_seconds))
+        burst_enabled = normalized_burst_packets > 0 and normalized_burst_window > 0
+
         with self._connect_honeypot() as conn:
             try:
-                row = conn.execute(
+                rows = conn.execute(
                     (
                         "SELECT id, ts, method, path, query_string, client_ip, user_agent, "
                         "body_size, body_text, headers_json "
-                        f"FROM scans WHERE {where_sql} ORDER BY id DESC LIMIT 1"
+                        f"FROM scans WHERE {where_sql} ORDER BY id DESC LIMIT 250"
                     ),
                     params,
-                ).fetchone()
+                ).fetchall()
             except sqlite3.OperationalError:
-                row = conn.execute(
+                rows = conn.execute(
                     (
                         "SELECT id, ts, method, path, query_string, client_ip, user_agent, body_size "
-                        f"FROM scans WHERE {where_sql} ORDER BY id DESC LIMIT 1"
+                        f"FROM scans WHERE {where_sql} ORDER BY id DESC LIMIT 250"
                     ),
                     params,
-                ).fetchone()
+                ).fetchall()
+
+            row = None
+            for candidate in rows:
+                if burst_enabled and not self._matches_burst_condition(
+                    conn,
+                    row=candidate,
+                    burst_packets=normalized_burst_packets,
+                    burst_window_seconds=normalized_burst_window,
+                ):
+                    continue
+                row = candidate
+                break
 
         if row is None:
             return None
@@ -596,6 +649,38 @@ class WebhookDispatcher:
                 else str(row["path"])
             ),
         }
+
+    def _matches_burst_condition(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        row: sqlite3.Row,
+        burst_packets: int,
+        burst_window_seconds: int,
+    ) -> bool:
+        client_ip = str(row["client_ip"]) if row["client_ip"] else ""
+        if not client_ip:
+            return False
+
+        ts_text = str(row["ts"])
+        try:
+            ts_dt = datetime.fromisoformat(ts_text)
+        except ValueError:
+            return False
+
+        window_start = (ts_dt - timedelta(seconds=burst_window_seconds)).isoformat(timespec="seconds")
+        count_row = conn.execute(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM scans
+            WHERE client_ip = ?
+              AND ts >= ?
+              AND ts <= ?
+            """,
+            (client_ip, window_start, ts_text),
+        ).fetchone()
+        count = int(count_row["cnt"]) if count_row else 0
+        return count >= burst_packets
 
     def _render_payload(self, *, webhook: WebhookRow, scan: dict[str, Any]) -> Any:
         return self._render_payload_from_values(

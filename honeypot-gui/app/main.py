@@ -101,12 +101,30 @@ def _verify_password(submitted_password: str) -> bool:
 def _normalize_webhook_filter(
     filter_method: str,
     body_size_gt_zero: str,
+    burst_packets: str,
+    burst_window_seconds: str,
     filter_field: str,
     filter_operator: str,
     filter_value: str,
-) -> tuple[str, bool, str, str, str]:
+) -> tuple[str, bool, int, int, str, str, str]:
     normalized_method = filter_method.strip().upper()
     normalized_body_size = body_size_gt_zero.strip().lower() == "on"
+
+    burst_packets_text = burst_packets.strip()
+    burst_window_text = burst_window_seconds.strip()
+    try:
+        normalized_burst_packets = int(burst_packets_text) if burst_packets_text else 0
+        normalized_burst_window = int(burst_window_text) if burst_window_text else 0
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Burst filters must be integer values") from exc
+
+    if normalized_burst_packets < 0 or normalized_burst_window < 0:
+        raise HTTPException(status_code=400, detail="Burst filters must be non-negative")
+
+    burst_enabled = normalized_burst_packets > 0 or normalized_burst_window > 0
+    if burst_enabled and (normalized_burst_packets < 1 or normalized_burst_window < 1):
+        raise HTTPException(status_code=400, detail="Burst filter requires packets >= 1 and window >= 1")
+
     normalized_field = filter_field.strip()
     normalized_operator = filter_operator.strip().lower()
     normalized_value = filter_value.strip()
@@ -121,9 +139,25 @@ def _normalize_webhook_filter(
         raise HTTPException(status_code=400, detail="Unsupported filter operator")
 
     if not normalized_field:
-        return normalized_method, normalized_body_size, "", normalized_operator, ""
+        return (
+            normalized_method,
+            normalized_body_size,
+            normalized_burst_packets,
+            normalized_burst_window,
+            "",
+            normalized_operator,
+            "",
+        )
 
-    return normalized_method, normalized_body_size, normalized_field, normalized_operator, normalized_value
+    return (
+        normalized_method,
+        normalized_body_size,
+        normalized_burst_packets,
+        normalized_burst_window,
+        normalized_field,
+        normalized_operator,
+        normalized_value,
+    )
 
 
 def _validate_webhook_interval(interval_seconds: int) -> int:
@@ -279,6 +313,8 @@ async def webhooks_page(request: Request, msg: str = Query(default="")):
         webhook.id: _db.list_matching_scans(
             method_filter=webhook.filter_method,
             body_size_gt_zero=webhook.body_size_gt_zero,
+            burst_packets=webhook.burst_packets,
+            burst_window_seconds=webhook.burst_window_seconds,
             field_filter=webhook.filter_field,
             operator_filter=webhook.filter_operator,
             value_filter=webhook.filter_value,
@@ -310,6 +346,8 @@ async def webhooks_create(
     interval_seconds: int = Form(...),
     filter_method: str = Form(default=""),
     body_size_gt_zero: str = Form(default="off"),
+    burst_packets: str = Form(default="0"),
+    burst_window_seconds: str = Form(default="0"),
     filter_field: str = Form(default=""),
     filter_operator: str = Form(default="equals"),
     filter_value: str = Form(default=""),
@@ -320,9 +358,11 @@ async def webhooks_create(
 
     interval_clean = _validate_webhook_interval(interval_seconds)
     payload_clean = _validate_webhook_payload_template(payload_template)
-    method_clean, body_size_clean, field_clean, operator_clean, value_clean = _normalize_webhook_filter(
+    method_clean, body_size_clean, burst_packets_clean, burst_window_clean, field_clean, operator_clean, value_clean = _normalize_webhook_filter(
         filter_method,
         body_size_gt_zero,
+        burst_packets,
+        burst_window_seconds,
         filter_field,
         filter_operator,
         filter_value,
@@ -335,6 +375,8 @@ async def webhooks_create(
         interval_seconds=interval_clean,
         filter_method=method_clean,
         body_size_gt_zero=body_size_clean,
+        burst_packets=burst_packets_clean,
+        burst_window_seconds=burst_window_clean,
         filter_field=field_clean,
         filter_operator=operator_clean,
         filter_value=value_clean,
@@ -352,6 +394,8 @@ async def webhooks_test(
     target_url: str = Form(...),
     filter_method: str = Form(default=""),
     body_size_gt_zero: str = Form(default="off"),
+    burst_packets: str = Form(default="0"),
+    burst_window_seconds: str = Form(default="0"),
     filter_field: str = Form(default=""),
     filter_operator: str = Form(default="equals"),
     filter_value: str = Form(default=""),
@@ -360,9 +404,11 @@ async def webhooks_test(
     _ = request
 
     payload_clean = _validate_webhook_payload_template(payload_template)
-    method_clean, body_size_clean, field_clean, operator_clean, value_clean = _normalize_webhook_filter(
+    method_clean, body_size_clean, burst_packets_clean, burst_window_clean, field_clean, operator_clean, value_clean = _normalize_webhook_filter(
         filter_method,
         body_size_gt_zero,
+        burst_packets,
+        burst_window_seconds,
         filter_field,
         filter_operator,
         filter_value,
@@ -374,6 +420,8 @@ async def webhooks_test(
         payload_template=payload_clean,
         filter_method=method_clean,
         body_size_gt_zero=body_size_clean,
+        burst_packets=burst_packets_clean,
+        burst_window_seconds=burst_window_clean,
         filter_field=field_clean,
         filter_operator=operator_clean,
         filter_value=value_clean,
@@ -389,6 +437,8 @@ async def webhooks_preview(
     name: str = Form(...),
     filter_method: str = Form(default=""),
     body_size_gt_zero: str = Form(default="off"),
+    burst_packets: str = Form(default="0"),
+    burst_window_seconds: str = Form(default="0"),
     filter_field: str = Form(default=""),
     filter_operator: str = Form(default="equals"),
     filter_value: str = Form(default=""),
@@ -397,9 +447,11 @@ async def webhooks_preview(
     _ = request
 
     payload_clean = _validate_webhook_payload_template(payload_template)
-    method_clean, body_size_clean, field_clean, operator_clean, value_clean = _normalize_webhook_filter(
+    method_clean, body_size_clean, burst_packets_clean, burst_window_clean, field_clean, operator_clean, value_clean = _normalize_webhook_filter(
         filter_method,
         body_size_gt_zero,
+        burst_packets,
+        burst_window_seconds,
         filter_field,
         filter_operator,
         filter_value,
@@ -410,6 +462,8 @@ async def webhooks_preview(
         payload_template=payload_clean,
         filter_method=method_clean,
         body_size_gt_zero=body_size_clean,
+        burst_packets=burst_packets_clean,
+        burst_window_seconds=burst_window_clean,
         filter_field=field_clean,
         filter_operator=operator_clean,
         filter_value=value_clean,
@@ -436,6 +490,8 @@ async def webhook_edit_page(request: Request, webhook_id: int):
             "preview_rows": _db.list_matching_scans(
                 method_filter=webhook.filter_method,
                 body_size_gt_zero=webhook.body_size_gt_zero,
+                burst_packets=webhook.burst_packets,
+                burst_window_seconds=webhook.burst_window_seconds,
                 field_filter=webhook.filter_field,
                 operator_filter=webhook.filter_operator,
                 value_filter=webhook.filter_value,
@@ -455,6 +511,8 @@ async def webhook_edit_submit(
     interval_seconds: int = Form(...),
     filter_method: str = Form(default=""),
     body_size_gt_zero: str = Form(default="off"),
+    burst_packets: str = Form(default="0"),
+    burst_window_seconds: str = Form(default="0"),
     filter_field: str = Form(default=""),
     filter_operator: str = Form(default="equals"),
     filter_value: str = Form(default=""),
@@ -465,9 +523,11 @@ async def webhook_edit_submit(
 
     interval_clean = _validate_webhook_interval(interval_seconds)
     payload_clean = _validate_webhook_payload_template(payload_template)
-    method_clean, body_size_clean, field_clean, operator_clean, value_clean = _normalize_webhook_filter(
+    method_clean, body_size_clean, burst_packets_clean, burst_window_clean, field_clean, operator_clean, value_clean = _normalize_webhook_filter(
         filter_method,
         body_size_gt_zero,
+        burst_packets,
+        burst_window_seconds,
         filter_field,
         filter_operator,
         filter_value,
@@ -481,6 +541,8 @@ async def webhook_edit_submit(
         interval_seconds=interval_clean,
         filter_method=method_clean,
         body_size_gt_zero=body_size_clean,
+        burst_packets=burst_packets_clean,
+        burst_window_seconds=burst_window_clean,
         filter_field=field_clean,
         filter_operator=operator_clean,
         filter_value=value_clean,

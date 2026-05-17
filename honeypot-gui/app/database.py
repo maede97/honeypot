@@ -252,6 +252,8 @@ class Database:
         operator_filter: str,
         value_filter: str,
         body_size_gt_zero: bool,
+        burst_packets: int,
+        burst_window_seconds: int,
         limit: int = 10,
     ) -> list[dict]:
         allowed_fields = {
@@ -288,17 +290,50 @@ class Database:
         if where_parts:
             where_sql = "WHERE " + " AND ".join(where_parts)
 
+        normalized_burst_packets = max(0, int(burst_packets))
+        normalized_burst_window = max(0, int(burst_window_seconds))
+        burst_enabled = normalized_burst_packets > 0 and normalized_burst_window > 0
+
         with self._connect() as conn:
-            rows = conn.execute(
+            candidates = conn.execute(
                 f"""
                 SELECT id, ts, method, path, query_string, client_ip, body_size
                 FROM scans
                 {where_sql}
                 ORDER BY id DESC
-                LIMIT ?
+                LIMIT 250
                 """,
-                [*params, max(1, min(limit, 50))],
+                params,
             ).fetchall()
+
+            rows: list[sqlite3.Row] = []
+            for candidate in candidates:
+                if burst_enabled:
+                    client_ip = str(candidate["client_ip"]) if candidate["client_ip"] else ""
+                    if not client_ip:
+                        continue
+                    try:
+                        ts_dt = datetime.fromisoformat(str(candidate["ts"]))
+                    except ValueError:
+                        continue
+                    window_start = (ts_dt - timedelta(seconds=normalized_burst_window)).isoformat(timespec="seconds")
+                    count_row = conn.execute(
+                        """
+                        SELECT COUNT(*) AS cnt
+                        FROM scans
+                        WHERE client_ip = ?
+                          AND ts >= ?
+                          AND ts <= ?
+                        """,
+                        (client_ip, window_start, str(candidate["ts"])),
+                    ).fetchone()
+                    count = int(count_row["cnt"]) if count_row else 0
+                    if count < normalized_burst_packets:
+                        continue
+
+                rows.append(candidate)
+                if len(rows) >= max(1, min(limit, 50)):
+                    break
 
         return [
             {

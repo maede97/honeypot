@@ -44,6 +44,8 @@
 
     <input type="hidden" name="filter_method" value="{{ webhook.filter_method }}" data-edit-filter-method />
     <input type="hidden" name="body_size_gt_zero" value="{{ 'on' if webhook.body_size_gt_zero else 'off' }}" data-edit-filter-body-size />
+    <input type="hidden" name="burst_packets" value="{{ webhook.burst_packets }}" data-edit-filter-burst-packets />
+    <input type="hidden" name="burst_window_seconds" value="{{ webhook.burst_window_seconds }}" data-edit-filter-burst-window />
     <input type="hidden" name="filter_field" value="{{ webhook.filter_field }}" data-edit-filter-field />
     <input type="hidden" name="filter_operator" value="{{ webhook.filter_operator }}" data-edit-filter-operator />
     <input type="hidden" name="filter_value" value="{{ webhook.filter_value }}" data-edit-filter-value />
@@ -183,6 +185,23 @@
       <input type="text" data-edit-modal-value class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400" />
     </label>
 
+    <div class="mt-3 rounded-xl border border-slate-700/80 bg-slate-900/70 p-3">
+      <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-200">
+        <input type="checkbox" data-edit-modal-burst-enabled class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-sky-500" />
+        Trigger when same IP sends burst traffic
+      </label>
+      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          Packets (X)
+          <input type="number" min="1" data-edit-modal-burst-packets class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          Interval Seconds (Y)
+          <input type="number" min="1" data-edit-modal-burst-window class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400" />
+        </label>
+      </div>
+    </div>
+
     <div class="mt-4 flex items-center justify-end gap-3">
       <button type="button" data-close-edit-filters class="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:border-slate-300">Cancel</button>
       <button type="button" data-save-edit-filters class="rounded-lg border border-sky-400/70 bg-sky-400/20 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-sky-300 transition hover:bg-sky-400/30">Save Filters</button>
@@ -209,6 +228,8 @@
 
     const hiddenMethod = document.querySelector('[data-edit-filter-method]');
     const hiddenBodySize = document.querySelector('[data-edit-filter-body-size]');
+    const hiddenBurstPackets = document.querySelector('[data-edit-filter-burst-packets]');
+    const hiddenBurstWindow = document.querySelector('[data-edit-filter-burst-window]');
     const hiddenField = document.querySelector('[data-edit-filter-field]');
     const hiddenOperator = document.querySelector('[data-edit-filter-operator]');
     const hiddenValue = document.querySelector('[data-edit-filter-value]');
@@ -216,15 +237,23 @@
 
     const modalMethod = document.querySelector('[data-edit-modal-method]');
     const modalBodySize = document.querySelector('[data-edit-modal-body-size]');
+    const modalBurstEnabled = document.querySelector('[data-edit-modal-burst-enabled]');
+    const modalBurstPackets = document.querySelector('[data-edit-modal-burst-packets]');
+    const modalBurstWindow = document.querySelector('[data-edit-modal-burst-window]');
     const modalField = document.querySelector('[data-edit-modal-field]');
     const modalOperator = document.querySelector('[data-edit-modal-operator]');
     const modalValue = document.querySelector('[data-edit-modal-value]');
 
-    function summaryText(method, bodySize, field, operator, value) {
+    function summaryText(method, bodySize, burstPackets, burstWindow, field, operator, value) {
       const parts = [];
       parts.push(method ? `method = ${method}` : 'Any method');
       if (bodySize === 'on') {
         parts.push('body_size > 0');
+      }
+      if (Number(burstPackets) > 0 && Number(burstWindow) > 0) {
+        parts.push(`same IP: ${burstPackets} in ${burstWindow}s`);
+      } else {
+        parts.push('burst disabled');
       }
       if (field && value) {
         parts.push(`${field} ${operator} ${value}`);
@@ -235,7 +264,15 @@
     }
 
     function refreshSummary() {
-      summary.textContent = summaryText(hiddenMethod.value, hiddenBodySize.value, hiddenField.value, hiddenOperator.value, hiddenValue.value);
+      summary.textContent = summaryText(
+        hiddenMethod.value,
+        hiddenBodySize.value,
+        hiddenBurstPackets.value,
+        hiddenBurstWindow.value,
+        hiddenField.value,
+        hiddenOperator.value,
+        hiddenValue.value,
+      );
     }
 
     function setTestResult(type, text) {
@@ -266,6 +303,9 @@
     function openModal() {
       modalMethod.value = hiddenMethod.value;
       modalBodySize.checked = hiddenBodySize.value === 'on';
+      modalBurstEnabled.checked = Number(hiddenBurstPackets.value) > 0 && Number(hiddenBurstWindow.value) > 0;
+      modalBurstPackets.value = Number(hiddenBurstPackets.value) > 0 ? hiddenBurstPackets.value : '';
+      modalBurstWindow.value = Number(hiddenBurstWindow.value) > 0 ? hiddenBurstWindow.value : '';
       modalField.value = hiddenField.value;
       modalOperator.value = hiddenOperator.value || 'equals';
       modalValue.value = hiddenValue.value;
@@ -283,6 +323,13 @@
     document.querySelector('[data-save-edit-filters]').addEventListener('click', () => {
       hiddenMethod.value = modalMethod.value;
       hiddenBodySize.value = modalBodySize.checked ? 'on' : 'off';
+      if (modalBurstEnabled.checked) {
+        hiddenBurstPackets.value = String(Math.max(1, Number(modalBurstPackets.value || '0')));
+        hiddenBurstWindow.value = String(Math.max(1, Number(modalBurstWindow.value || '0')));
+      } else {
+        hiddenBurstPackets.value = '0';
+        hiddenBurstWindow.value = '0';
+      }
       hiddenField.value = modalField.value;
       hiddenOperator.value = modalOperator.value;
       hiddenValue.value = modalValue.value;
