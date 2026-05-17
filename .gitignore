@@ -2,3 +2,5 @@
 data/
 __pycache__/
 *.pyc
+honeypot-data/
+honeypot-gui-data/

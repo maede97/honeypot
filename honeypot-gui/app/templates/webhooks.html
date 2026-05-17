@@ -1,0 +1,436 @@
+{% extends "base.html" %}
+{% block title %}Webhooks | Honeypot GUI{% endblock %}
+{% block content %}
+<section class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-2xl font-bold text-white">Webhooks</h1>
+    <span class="rounded-lg border border-slate-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-300">{{ webhooks|length }} configured</span>
+  </div>
+
+  {% if message %}
+  <div class="mt-4 rounded-xl border border-emerald-400/50 bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-300">
+    {{ message }}
+  </div>
+  {% endif %}
+
+  <div class="mt-5 grid gap-5 lg:grid-cols-2">
+    <article class="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4">
+      <h2 class="text-lg font-semibold text-white">Create Webhook</h2>
+      <form method="post" action="/webhooks" class="mt-4 grid gap-3" data-create-webhook-form>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          Name
+          <input
+            type="text"
+            name="name"
+            required
+            placeholder="Example: Alert for POST /admin"
+            class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
+          />
+        </label>
+
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          Target URL
+          <input
+            type="url"
+            name="target_url"
+            required
+            placeholder="https://example.com/hooks/honeypot"
+            class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
+          />
+        </label>
+
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          Trigger Every (seconds)
+          <input
+            type="number"
+            name="interval_seconds"
+            min="1"
+            value="30"
+            required
+            class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
+          />
+        </label>
+
+        <input type="hidden" name="filter_method" value="" data-create-filter-method />
+        <input type="hidden" name="body_size_gt_zero" value="off" data-create-filter-body-size />
+        <input type="hidden" name="filter_field" value="" data-create-filter-field />
+        <input type="hidden" name="filter_operator" value="equals" data-create-filter-operator />
+        <input type="hidden" name="filter_value" value="" data-create-filter-value />
+
+        <div class="rounded-xl border border-slate-700/80 bg-slate-900/70 p-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">Trigger Filters</p>
+            <button
+              type="button"
+              data-open-create-filters
+              class="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:border-sky-400 hover:text-white"
+            >
+              Configure
+            </button>
+          </div>
+          <p data-create-filter-summary class="mt-2 text-sm text-slate-300">Any method, no field filter, body size unrestricted.</p>
+        </div>
+
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          Payload Template (JSON)
+          <textarea
+            name="payload_template"
+            rows="12"
+            required
+            class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-100 outline-none transition focus:border-sky-400"
+          >{% raw %}{
+  "source": "honeypot",
+  "event": "scan",
+  "scan_id": {{ scan.id | tojson }},
+  "timestamp": {{ scan.ts | tojson }},
+  "method": {{ scan.method | tojson }},
+  "path": {{ scan.path | tojson }},
+  "query": {{ scan.query_string | tojson }},
+  "client_ip": {{ scan.client_ip | tojson }},
+  "body_size": {{ scan.body_size | tojson }},
+  "webhook_name": {{ webhook.name | tojson }},
+  "sent_at": {{ now | tojson }}
+}{% endraw %}</textarea>
+        </label>
+
+        <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-200">
+          <input type="checkbox" name="enabled" checked class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-sky-500" />
+          Enable after creation
+        </label>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            data-preview-webhook
+            class="rounded-xl border border-emerald-400/70 bg-emerald-400/20 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-400/30"
+          >
+            Preview Payload
+          </button>
+          <button
+            type="button"
+            data-test-webhook
+            class="rounded-xl border border-amber-400/70 bg-amber-400/20 px-4 py-2 text-sm font-semibold text-amber-300 transition hover:bg-amber-400/30"
+          >
+            Test
+          </button>
+          <button
+            type="submit"
+            class="rounded-xl border border-sky-400/70 bg-sky-400/20 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-400/30"
+          >
+            Create Webhook
+          </button>
+        </div>
+
+        <div data-test-result class="hidden rounded-xl border px-4 py-3 text-sm"></div>
+        <div data-preview-panel class="hidden rounded-xl border border-slate-700/80 bg-slate-900/70 p-3">
+          <div class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">Generated Payload Preview</div>
+          <div data-preview-meta class="mt-2 text-xs text-slate-400"></div>
+          <pre data-preview-json class="mt-2 overflow-x-auto rounded-lg border border-slate-700 bg-slate-950 p-3 font-mono text-xs text-slate-100"></pre>
+        </div>
+      </form>
+    </article>
+
+    <article class="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4">
+      <h2 class="text-lg font-semibold text-white">Template Fields</h2>
+      <ul class="mt-3 space-y-1 text-sm text-slate-200">
+        <li><span class="font-mono text-sky-300">scan.id</span>, <span class="font-mono text-sky-300">scan.ts</span>, <span class="font-mono text-sky-300">scan.method</span>, <span class="font-mono text-sky-300">scan.path</span></li>
+        <li><span class="font-mono text-sky-300">scan.query_string</span>, <span class="font-mono text-sky-300">scan.url</span>, <span class="font-mono text-sky-300">scan.client_ip</span></li>
+        <li><span class="font-mono text-sky-300">scan.user_agent</span>, <span class="font-mono text-sky-300">scan.body_size</span>, <span class="font-mono text-sky-300">scan.body_text</span></li>
+        <li><span class="font-mono text-sky-300">scan.headers</span> (object with request headers)</li>
+        <li><span class="font-mono text-emerald-300">webhook.id</span>, <span class="font-mono text-emerald-300">webhook.name</span>, <span class="font-mono text-amber-300">now</span></li>
+      </ul>
+      <p class="mt-3 text-sm text-slate-300">Use <span class="font-mono text-slate-100">| tojson</span> on dynamic values to generate valid JSON safely.</p>
+    </article>
+  </div>
+</section>
+
+<section class="mt-5 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 shadow-2xl shadow-black/30">
+  <div class="border-b border-slate-700/70 px-5 py-4">
+    <h2 class="text-xl font-semibold text-white">Configured Webhooks</h2>
+  </div>
+
+  {% if webhooks %}
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-800 text-left text-xs uppercase tracking-[0.16em] text-slate-300">
+        <tr>
+          <th class="px-4 py-3">ID</th>
+          <th class="px-4 py-3">Name</th>
+          <th class="px-4 py-3">Endpoint</th>
+          <th class="px-4 py-3">Interval</th>
+          <th class="px-4 py-3">Filter</th>
+          <th class="px-4 py-3">Last Result</th>
+          <th class="px-4 py-3">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for webhook in webhooks %}
+      <tr class="border-t border-slate-700/60 align-top">
+        <td class="px-4 py-3 font-mono text-xs text-slate-300">{{ webhook.id }}</td>
+        <td class="px-4 py-3">
+          <div class="font-semibold text-white">{{ webhook.name }}</div>
+          <span class="inline-flex mt-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold {{ 'border-emerald-400/60 bg-emerald-500/15 text-emerald-300' if webhook.enabled else 'border-rose-400/60 bg-rose-500/15 text-rose-300' }}">{{ 'Enabled' if webhook.enabled else 'Disabled' }}</span>
+        </td>
+        <td class="max-w-[24rem] px-4 py-3 font-mono text-xs break-all text-slate-200">{{ webhook.target_url }}</td>
+        <td class="px-4 py-3 text-slate-200">{{ webhook.interval_seconds }}s</td>
+        <td class="px-4 py-3 text-slate-200">
+          {% if webhook.filter_method %}
+          <span class="font-mono text-xs text-emerald-300">method = {{ webhook.filter_method }}</span><br />
+          {% endif %}
+          {% if webhook.body_size_gt_zero %}
+          <span class="font-mono text-xs text-amber-300">body_size > 0</span><br />
+          {% endif %}
+          {% if webhook.filter_field %}
+          <span class="font-mono text-xs">{{ webhook.filter_field }} {{ webhook.filter_operator }} {{ webhook.filter_value }}</span>
+          {% else %}
+          <span class="text-slate-400">No field filter</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-xs">
+          <div class="text-slate-300">Status: {{ webhook.last_response_status if webhook.last_response_status is not none else '-' }}</div>
+          <div class="text-slate-400">Run: {{ webhook.last_run_at or '-' }}</div>
+          {% if webhook.last_error %}
+          <div class="mt-1 max-w-[18rem] break-words text-rose-300">{{ webhook.last_error }}</div>
+          {% endif %}
+        </td>
+        <td class="px-4 py-3">
+          <a href="/webhooks/{{ webhook.id }}/edit" class="inline-flex rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:border-sky-400 hover:text-white">Edit</a>
+        </td>
+      </tr>
+      <tr class="border-t border-slate-800/80">
+        <td colspan="7" class="px-4 py-3">
+          <div class="rounded-xl border border-slate-700/70 bg-slate-900/70 p-3">
+            <h3 class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">Recent Messages That Would Trigger</h3>
+            {% set preview_rows = preview_by_webhook.get(webhook.id, []) %}
+            {% if preview_rows %}
+            <ul class="mt-2 space-y-1 font-mono text-xs text-slate-200">
+              {% for row in preview_rows %}
+              <li>#{{ row.id }} {{ row.ts }} {{ row.method }} {{ row.path }}{% if row.query_string %}?{{ row.query_string }}{% endif %} size={{ row.body_size }} {% if row.client_ip %}ip={{ row.client_ip }}{% endif %}</li>
+              {% endfor %}
+            </ul>
+            {% else %}
+            <p class="mt-2 text-xs text-slate-400">No current matching scans.</p>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="px-5 py-6 text-sm text-slate-300">No webhooks configured yet.</div>
+  {% endif %}
+</section>
+
+<div data-create-filter-modal class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/80 p-4">
+  <div class="w-full max-w-xl rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl shadow-black/40">
+    <div class="flex items-center justify-between gap-3">
+      <h3 class="text-lg font-semibold text-white">Configure Trigger Filters</h3>
+      <button type="button" data-close-create-filters class="rounded-lg border border-slate-600 px-2 py-1 text-xs font-semibold text-slate-200 hover:border-slate-300">Close</button>
+    </div>
+
+    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+      <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+        HTTP Method
+        <select data-create-modal-method class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400">
+          {% for method in filter_methods %}
+          <option value="{{ method }}">{{ method if method else 'Any method' }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+        Body Size
+        <span class="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100">
+          <input type="checkbox" data-create-modal-body-size class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-sky-500" />
+          Require body_size &gt; 0
+        </span>
+      </label>
+
+      <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+        Field
+        <select data-create-modal-field class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400">
+          {% for field in filter_fields %}
+          <option value="{{ field }}">{{ field if field else 'No field filter' }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+        Match Mode
+        <select data-create-modal-operator class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400">
+          {% for operator in filter_operators %}
+          <option value="{{ operator }}">{{ operator }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <label class="mt-3 grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+      Field Value
+      <input type="text" data-create-modal-value class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400" />
+    </label>
+
+    <div class="mt-4 flex items-center justify-end gap-3">
+      <button type="button" data-close-create-filters class="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:border-slate-300">Cancel</button>
+      <button type="button" data-save-create-filters class="rounded-lg border border-sky-400/70 bg-sky-400/20 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-sky-300 transition hover:bg-sky-400/30">Save Filters</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const modal = document.querySelector('[data-create-filter-modal]');
+    if (!modal) {
+      return;
+    }
+
+    const form = document.querySelector('[data-create-webhook-form]');
+    const previewButton = document.querySelector('[data-preview-webhook]');
+    const testButton = document.querySelector('[data-test-webhook]');
+    const testResult = document.querySelector('[data-test-result]');
+    const previewPanel = document.querySelector('[data-preview-panel]');
+    const previewMeta = document.querySelector('[data-preview-meta]');
+    const previewJson = document.querySelector('[data-preview-json]');
+
+    const hiddenMethod = document.querySelector('[data-create-filter-method]');
+    const hiddenBodySize = document.querySelector('[data-create-filter-body-size]');
+    const hiddenField = document.querySelector('[data-create-filter-field]');
+    const hiddenOperator = document.querySelector('[data-create-filter-operator]');
+    const hiddenValue = document.querySelector('[data-create-filter-value]');
+    const summary = document.querySelector('[data-create-filter-summary]');
+
+    const modalMethod = document.querySelector('[data-create-modal-method]');
+    const modalBodySize = document.querySelector('[data-create-modal-body-size]');
+    const modalField = document.querySelector('[data-create-modal-field]');
+    const modalOperator = document.querySelector('[data-create-modal-operator]');
+    const modalValue = document.querySelector('[data-create-modal-value]');
+
+    function summaryText(method, bodySize, field, operator, value) {
+      const parts = [];
+      parts.push(method ? `method = ${method}` : 'Any method');
+      if (bodySize === 'on') {
+        parts.push('body_size > 0');
+      }
+      if (field && value) {
+        parts.push(`${field} ${operator} ${value}`);
+      } else {
+        parts.push('No field filter');
+      }
+      return parts.join(', ');
+    }
+
+    function refreshSummary() {
+      summary.textContent = summaryText(hiddenMethod.value, hiddenBodySize.value, hiddenField.value, hiddenOperator.value, hiddenValue.value);
+    }
+
+    function setTestResult(type, text) {
+      if (!testResult) {
+        return;
+      }
+      testResult.classList.remove('hidden', 'border-emerald-400/50', 'bg-emerald-500/10', 'text-emerald-300', 'border-rose-400/50', 'bg-rose-500/10', 'text-rose-300', 'border-amber-400/50', 'bg-amber-500/10', 'text-amber-300');
+      if (type === 'success') {
+        testResult.classList.add('border-emerald-400/50', 'bg-emerald-500/10', 'text-emerald-300');
+      } else if (type === 'info') {
+        testResult.classList.add('border-amber-400/50', 'bg-amber-500/10', 'text-amber-300');
+      } else {
+        testResult.classList.add('border-rose-400/50', 'bg-rose-500/10', 'text-rose-300');
+      }
+      testResult.textContent = text;
+    }
+
+    function setPreview(result) {
+      if (!previewPanel || !previewMeta || !previewJson) {
+        return;
+      }
+      previewPanel.classList.remove('hidden');
+      const scan = result.scan || {};
+      previewMeta.textContent = `Scan #${scan.id ?? '-'} ${scan.method ?? ''} ${scan.path ?? ''}`.trim();
+      previewJson.textContent = JSON.stringify(result.payload, null, 2);
+    }
+
+    function openModal() {
+      modalMethod.value = hiddenMethod.value;
+      modalBodySize.checked = hiddenBodySize.value === 'on';
+      modalField.value = hiddenField.value;
+      modalOperator.value = hiddenOperator.value || 'equals';
+      modalValue.value = hiddenValue.value;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeModal() {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    document.querySelector('[data-open-create-filters]').addEventListener('click', openModal);
+    modal.querySelectorAll('[data-close-create-filters]').forEach((node) => node.addEventListener('click', closeModal));
+    document.querySelector('[data-save-create-filters]').addEventListener('click', () => {
+      hiddenMethod.value = modalMethod.value;
+      hiddenBodySize.value = modalBodySize.checked ? 'on' : 'off';
+      hiddenField.value = modalField.value;
+      hiddenOperator.value = modalOperator.value;
+      hiddenValue.value = modalValue.value;
+      refreshSummary();
+      closeModal();
+    });
+
+    if (form && testButton) {
+      testButton.addEventListener('click', async () => {
+        setTestResult('info', 'Running test notification...');
+        testButton.disabled = true;
+        try {
+          const payload = new FormData(form);
+          const response = await fetch('/webhooks/test', {
+            method: 'POST',
+            body: payload,
+          });
+          const data = await response.json();
+          if (response.ok && data.ok) {
+            const scan = data.scan || {};
+            setTestResult('success', `Test sent (HTTP ${data.response_status ?? '-'}) using scan #${scan.id ?? '-'} ${scan.method ?? ''} ${scan.path ?? ''}`.trim());
+          } else {
+            const status = data.response_status ? ` (HTTP ${data.response_status})` : '';
+            setTestResult('error', `${data.message || 'Test failed'}${status}`);
+          }
+        } catch (_error) {
+          setTestResult('error', 'Test failed due to a network or server error.');
+        } finally {
+          testButton.disabled = false;
+        }
+      });
+    }
+
+    if (form && previewButton) {
+      previewButton.addEventListener('click', async () => {
+        setTestResult('info', 'Generating payload preview...');
+        previewButton.disabled = true;
+        try {
+          const payload = new FormData(form);
+          const response = await fetch('/webhooks/preview', {
+            method: 'POST',
+            body: payload,
+          });
+          const data = await response.json();
+          if (response.ok && data.ok) {
+            setPreview(data);
+            setTestResult('success', 'Payload preview generated.');
+          } else {
+            setTestResult('error', data.message || 'Preview generation failed.');
+          }
+        } catch (_error) {
+          setTestResult('error', 'Preview failed due to a network or server error.');
+        } finally {
+          previewButton.disabled = false;
+        }
+      });
+    }
+
+    refreshSummary();
+  })();
+</script>
+{% endblock %}

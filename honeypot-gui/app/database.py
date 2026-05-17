@@ -243,3 +243,72 @@ class Database:
                 for method, count in sorted(method_counts.items(), key=lambda item: (-item[1], item[0]))
             ],
         }
+
+    def list_matching_scans(
+        self,
+        *,
+        method_filter: str,
+        field_filter: str,
+        operator_filter: str,
+        value_filter: str,
+        body_size_gt_zero: bool,
+        limit: int = 10,
+    ) -> list[dict]:
+        allowed_fields = {
+            "path": "path",
+            "client_ip": "client_ip",
+            "user_agent": "user_agent",
+            "query_string": "query_string",
+            "body_text": "body_text",
+        }
+        field_sql = allowed_fields.get(field_filter, "")
+        operator = operator_filter if operator_filter in {"equals", "contains"} else "equals"
+
+        where_parts = []
+        params: list[str | int] = []
+
+        method_value = method_filter.strip().upper()
+        if method_value:
+            where_parts.append("method = ?")
+            params.append(method_value)
+
+        if body_size_gt_zero:
+            where_parts.append("body_size > 0")
+
+        filter_value = value_filter.strip()
+        if field_sql and filter_value:
+            if operator == "contains":
+                where_parts.append(f"COALESCE({field_sql}, '') LIKE ?")
+                params.append(f"%{filter_value}%")
+            else:
+                where_parts.append(f"COALESCE({field_sql}, '') = ?")
+                params.append(filter_value)
+
+        where_sql = ""
+        if where_parts:
+            where_sql = "WHERE " + " AND ".join(where_parts)
+
+        with self._connect() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT id, ts, method, path, query_string, client_ip, body_size
+                FROM scans
+                {where_sql}
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                [*params, max(1, min(limit, 50))],
+            ).fetchall()
+
+        return [
+            {
+                "id": int(row["id"]),
+                "ts": str(row["ts"]),
+                "method": str(row["method"]),
+                "path": str(row["path"]),
+                "query_string": str(row["query_string"]),
+                "client_ip": str(row["client_ip"]) if row["client_ip"] else "",
+                "body_size": int(row["body_size"]) if "body_size" in row.keys() else 0,
+            }
+            for row in rows
+        ]

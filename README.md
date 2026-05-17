@@ -8,6 +8,7 @@ Docker Compose setup for a scanner-attracting HTTP service exposed on a VPS IP a
 - Logs every inbound HTTP request path into SQLite.
 - Rolls up and prunes raw scan records older than 7 days while keeping daily/method totals for dashboards.
 - Exposes a GUI with login-protected browsing.
+- Supports GUI-managed webhooks with interval triggers, optional scan field filters, and templated JSON payload delivery.
 
 ## Images
 
@@ -82,9 +83,20 @@ In compose environment for honeypot:
 In compose environment for `honeypot-gui`:
 
 - `HONEYPOT_DB_PATH`: SQLite path (`/data/honeypot.db`) shared from honeypot volume, mounted read-only.
+- `GUI_DB_PATH`: Writable SQLite path used by the GUI for local settings and webhook definitions.
 - `GUI_ADMIN_USERNAME`: Admin username used by login form.
 - `GUI_ADMIN_PASSWORD_BCRYPT`: Bcrypt password hash used for authentication.
 - `GUI_SESSION_SECRET`: Cookie signing secret.
+
+## Webhooks
+
+- Configure webhooks in the GUI under the `Webhooks` page.
+- Trigger behavior: every `X` seconds per webhook.
+- Optional filtering: match a scan field exactly (for example `method = POST` or `path = /admin`).
+- Payload is rendered from a JSON template with these variables:
+	- `scan.id`, `scan.ts`, `scan.method`, `scan.path`, `scan.query_string`, `scan.url`, `scan.client_ip`, `scan.user_agent`, `scan.body_size`, `scan.body_text`
+	- `webhook.id`, `webhook.name`, `now`
+- Use `| tojson` for dynamic values in templates to keep output JSON valid.
 
 Generate the GUI bcrypt hash:
 

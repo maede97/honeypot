@@ -118,7 +118,7 @@
     <table class="w-full table-auto text-sm">
       <thead class="bg-slate-800 text-left text-xs uppercase tracking-[0.16em] text-slate-300">
         <tr>
-          <th class="px-4 py-3 whitespace-nowrap">
+          <th class="w-[88px] px-3 py-3 whitespace-nowrap">
             <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ts&sort_dir={{ time_sort_dir }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Time</span>
               {% if sort.by == 'ts' %}
@@ -128,7 +128,7 @@
               {% endif %}
             </a>
           </th>
-          <th class="px-4 py-3 whitespace-nowrap">
+          <th class="w-[74px] px-2 py-3 whitespace-nowrap">
             <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=method&sort_dir={{ method_sort_dir }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Method</span>
               {% if sort.by == 'method' %}
@@ -138,7 +138,7 @@
               {% endif %}
             </a>
           </th>
-          <th class="px-4 py-3">
+          <th class="min-w-[220px] px-3 py-3">
             <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=path&sort_dir={{ path_sort_dir }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Path</span>
               {% if sort.by == 'path' %}
@@ -168,7 +168,7 @@
               {% endif %}
             </a>
           </th>
-          <th class="px-4 py-3 whitespace-nowrap">
+          <th class="w-[74px] px-2 py-3 whitespace-nowrap">
             <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=body&sort_dir={{ body_sort_dir }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Body</span>
               {% if sort.by == 'body' %}
@@ -197,11 +197,18 @@
       {% set method_classes = "bg-slate-700/30 text-slate-200 border-slate-500/60" %}
       {% endif %}
       <tr class="border-t border-slate-700/60 align-top text-slate-200">
-        <td class="whitespace-nowrap px-4 py-3 font-mono text-xs">{{ row.ts }}</td>
-        <td class="px-4 py-3">
-          <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold {{ method_classes }}">{{ row.method }}</span>
+        <td class="px-3 py-3 font-mono text-[11px] leading-4 text-slate-300">
+          {% if row.ts and row.ts|length >= 19 %}
+          <span class="block">{{ row.ts[0:10] }}</span>
+          <span class="block text-slate-400">{{ row.ts[11:19] }}</span>
+          {% else %}
+          <span class="block">{{ row.ts }}</span>
+          {% endif %}
         </td>
-        <td class="min-w-0 px-4 py-3">
+        <td class="px-2 py-3">
+          <span class="inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold {{ method_classes }}">{{ row.method }}</span>
+        </td>
+        <td class="min-w-0 px-3 py-3">
           <div
             data-copy-field
             tabindex="0"
@@ -230,7 +237,7 @@
           -
           {% endif %}
         </td>
-        <td class="px-4 py-3 font-mono text-xs">{{ row.body_size }}</td>
+        <td class="px-2 py-3 text-right font-mono text-xs">{{ row.body_size }}</td>
         <td class="px-4 py-3">
           <a
             href="/scans/{{ row.id }}"

@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+{% block title %}Edit Webhook | Honeypot GUI{% endblock %}
+{% block content %}
+<section class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+  <div class="flex items-center justify-between gap-3">
+    <h1 class="text-2xl font-bold text-white">Edit Webhook #{{ webhook.id }}</h1>
+    <a href="/webhooks" class="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:border-sky-400 hover:text-white">Back to Webhooks</a>
+  </div>
+
+  <form method="post" action="/webhooks/{{ webhook.id }}/edit" class="mt-5 grid gap-3" data-edit-webhook-form>
+    <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+      Name
+      <input
+        type="text"
+        name="name"
+        required
+        value="{{ webhook.name }}"
+        class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
+      />
+    </label>
+
+    <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+      Target URL
+      <input
+        type="url"
+        name="target_url"
+        required
+        value="{{ webhook.target_url }}"
+        class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
+      />
+    </label>
+
+    <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+      Trigger Every (seconds)
+      <input
+        type="number"
+        name="interval_seconds"
+        min="1"
+        value="{{ webhook.interval_seconds }}"
+        required
+        class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
+      />
+    </label>
+
+    <input type="hidden" name="filter_method" value="{{ webhook.filter_method }}" data-edit-filter-method />
+    <input type="hidden" name="body_size_gt_zero" value="{{ 'on' if webhook.body_size_gt_zero else 'off' }}" data-edit-filter-body-size />
+    <input type="hidden" name="filter_field" value="{{ webhook.filter_field }}" data-edit-filter-field />
+    <input type="hidden" name="filter_operator" value="{{ webhook.filter_operator }}" data-edit-filter-operator />
+    <input type="hidden" name="filter_value" value="{{ webhook.filter_value }}" data-edit-filter-value />
+
+    <div class="rounded-xl border border-slate-700/80 bg-slate-900/70 p-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">Trigger Filters</p>
+        <button
+          type="button"
+          data-open-edit-filters
+          class="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:border-sky-400 hover:text-white"
+        >
+          Configure
+        </button>
+      </div>
+      <p data-edit-filter-summary class="mt-2 text-sm text-slate-300"></p>
+    </div>
+
+    <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+      Payload Template (JSON)
+      <textarea
+        name="payload_template"
+        rows="14"
+        required
+        class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-100 outline-none transition focus:border-sky-400"
+      >{{ webhook.payload_template }}</textarea>
+    </label>
+
+    <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-200">
+      <input type="checkbox" name="enabled" {% if webhook.enabled %}checked{% endif %} class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-sky-500" />
+      Webhook enabled
+    </label>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        data-preview-edit-webhook
+        class="rounded-xl border border-emerald-400/70 bg-emerald-400/20 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-400/30"
+      >
+        Preview Payload
+      </button>
+      <button
+        type="button"
+        data-test-edit-webhook
+        class="rounded-xl border border-amber-400/70 bg-amber-400/20 px-4 py-2 text-sm font-semibold text-amber-300 transition hover:bg-amber-400/30"
+      >
+        Test
+      </button>
+      <button
+        type="submit"
+        class="rounded-xl border border-sky-400/70 bg-sky-400/20 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-400/30"
+      >
+        Save Changes
+      </button>
+    </div>
+
+    <div data-edit-test-result class="hidden rounded-xl border px-4 py-3 text-sm"></div>
+    <div data-edit-preview-panel class="hidden rounded-xl border border-slate-700/80 bg-slate-900/70 p-3">
+      <div class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">Generated Payload Preview</div>
+      <div data-edit-preview-meta class="mt-2 text-xs text-slate-400"></div>
+      <pre data-edit-preview-json class="mt-2 overflow-x-auto rounded-lg border border-slate-700 bg-slate-950 p-3 font-mono text-xs text-slate-100"></pre>
+    </div>
+  </form>
+
+  <div class="mt-6 rounded-xl border border-slate-700/70 bg-slate-900/70 p-4">
+    <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-slate-200">Recent Messages That Would Trigger</h2>
+    {% if preview_rows %}
+    <ul class="mt-3 space-y-1 font-mono text-xs text-slate-200">
+      {% for row in preview_rows %}
+      <li>#{{ row.id }} {{ row.ts }} {{ row.method }} {{ row.path }}{% if row.query_string %}?{{ row.query_string }}{% endif %} size={{ row.body_size }} {% if row.client_ip %}ip={{ row.client_ip }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="mt-2 text-xs text-slate-400">No current matching scans.</p>
+    {% endif %}
+  </div>
+
+  <div class="mt-6 rounded-xl border border-rose-500/50 bg-rose-500/10 p-4">
+    <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-rose-200">Danger Zone</h2>
+    <form method="post" action="/webhooks/{{ webhook.id }}/delete" class="mt-3">
+      <button
+        type="submit"
+        class="rounded-xl border border-rose-400/70 bg-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/30"
+      >
+        Delete Webhook
+      </button>
+    </form>
+  </div>
+</section>
+
+<div data-edit-filter-modal class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/80 p-4">
+  <div class="w-full max-w-xl rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl shadow-black/40">
+    <div class="flex items-center justify-between gap-3">
+      <h3 class="text-lg font-semibold text-white">Configure Trigger Filters</h3>
+      <button type="button" data-close-edit-filters class="rounded-lg border border-slate-600 px-2 py-1 text-xs font-semibold text-slate-200 hover:border-slate-300">Close</button>
+    </div>
+
+    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+      <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+        HTTP Method
+        <select data-edit-modal-method class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400">
+          {% for method in filter_methods %}
+          <option value="{{ method }}">{{ method if method else 'Any method' }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+        Body Size
+        <span class="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100">
+          <input type="checkbox" data-edit-modal-body-size class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-sky-500" />
+          Require body_size &gt; 0
+        </span>
+      </label>
+
+      <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+        Field
+        <select data-edit-modal-field class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400">
+          {% for field in filter_fields %}
+          <option value="{{ field }}">{{ field if field else 'No field filter' }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+        Match Mode
+        <select data-edit-modal-operator class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400">
+          {% for operator in filter_operators %}
+          <option value="{{ operator }}">{{ operator }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <label class="mt-3 grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+      Field Value
+      <input type="text" data-edit-modal-value class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400" />
+    </label>
+
+    <div class="mt-4 flex items-center justify-end gap-3">
+      <button type="button" data-close-edit-filters class="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:border-slate-300">Cancel</button>
+      <button type="button" data-save-edit-filters class="rounded-lg border border-sky-400/70 bg-sky-400/20 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-sky-300 transition hover:bg-sky-400/30">Save Filters</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const modal = document.querySelector('[data-edit-filter-modal]');
+    if (!modal) {
+      return;
+    }
+
+    const form = document.querySelector('[data-edit-webhook-form]');
+    const previewButton = document.querySelector('[data-preview-edit-webhook]');
+    const testButton = document.querySelector('[data-test-edit-webhook]');
+    const testResult = document.querySelector('[data-edit-test-result]');
+    const previewPanel = document.querySelector('[data-edit-preview-panel]');
+    const previewMeta = document.querySelector('[data-edit-preview-meta]');
+    const previewJson = document.querySelector('[data-edit-preview-json]');
+
+    const hiddenMethod = document.querySelector('[data-edit-filter-method]');
+    const hiddenBodySize = document.querySelector('[data-edit-filter-body-size]');
+    const hiddenField = document.querySelector('[data-edit-filter-field]');
+    const hiddenOperator = document.querySelector('[data-edit-filter-operator]');
+    const hiddenValue = document.querySelector('[data-edit-filter-value]');
+    const summary = document.querySelector('[data-edit-filter-summary]');
+
+    const modalMethod = document.querySelector('[data-edit-modal-method]');
+    const modalBodySize = document.querySelector('[data-edit-modal-body-size]');
+    const modalField = document.querySelector('[data-edit-modal-field]');
+    const modalOperator = document.querySelector('[data-edit-modal-operator]');
+    const modalValue = document.querySelector('[data-edit-modal-value]');
+
+    function summaryText(method, bodySize, field, operator, value) {
+      const parts = [];
+      parts.push(method ? `method = ${method}` : 'Any method');
+      if (bodySize === 'on') {
+        parts.push('body_size > 0');
+      }
+      if (field && value) {
+        parts.push(`${field} ${operator} ${value}`);
+      } else {
+        parts.push('No field filter');
+      }
+      return parts.join(', ');
+    }
+
+    function refreshSummary() {
+      summary.textContent = summaryText(hiddenMethod.value, hiddenBodySize.value, hiddenField.value, hiddenOperator.value, hiddenValue.value);
+    }
+
+    function setTestResult(type, text) {
+      if (!testResult) {
+        return;
+      }
+      testResult.classList.remove('hidden', 'border-emerald-400/50', 'bg-emerald-500/10', 'text-emerald-300', 'border-rose-400/50', 'bg-rose-500/10', 'text-rose-300', 'border-amber-400/50', 'bg-amber-500/10', 'text-amber-300');
+      if (type === 'success') {
+        testResult.classList.add('border-emerald-400/50', 'bg-emerald-500/10', 'text-emerald-300');
+      } else if (type === 'info') {
+        testResult.classList.add('border-amber-400/50', 'bg-amber-500/10', 'text-amber-300');
+      } else {
+        testResult.classList.add('border-rose-400/50', 'bg-rose-500/10', 'text-rose-300');
+      }
+      testResult.textContent = text;
+    }
+
+    function setPreview(result) {
+      if (!previewPanel || !previewMeta || !previewJson) {
+        return;
+      }
+      previewPanel.classList.remove('hidden');
+      const scan = result.scan || {};
+      previewMeta.textContent = `Scan #${scan.id ?? '-'} ${scan.method ?? ''} ${scan.path ?? ''}`.trim();
+      previewJson.textContent = JSON.stringify(result.payload, null, 2);
+    }
+
+    function openModal() {
+      modalMethod.value = hiddenMethod.value;
+      modalBodySize.checked = hiddenBodySize.value === 'on';
+      modalField.value = hiddenField.value;
+      modalOperator.value = hiddenOperator.value || 'equals';
+      modalValue.value = hiddenValue.value;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeModal() {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    document.querySelector('[data-open-edit-filters]').addEventListener('click', openModal);
+    modal.querySelectorAll('[data-close-edit-filters]').forEach((node) => node.addEventListener('click', closeModal));
+    document.querySelector('[data-save-edit-filters]').addEventListener('click', () => {
+      hiddenMethod.value = modalMethod.value;
+      hiddenBodySize.value = modalBodySize.checked ? 'on' : 'off';
+      hiddenField.value = modalField.value;
+      hiddenOperator.value = modalOperator.value;
+      hiddenValue.value = modalValue.value;
+      refreshSummary();
+      closeModal();
+    });
+
+    if (form && testButton) {
+      testButton.addEventListener('click', async () => {
+        setTestResult('info', 'Running test notification...');
+        testButton.disabled = true;
+        try {
+          const payload = new FormData(form);
+          const response = await fetch('/webhooks/test', {
+            method: 'POST',
+            body: payload,
+          });
+          const data = await response.json();
+          if (response.ok && data.ok) {
+            const scan = data.scan || {};
+            setTestResult('success', `Test sent (HTTP ${data.response_status ?? '-'}) using scan #${scan.id ?? '-'} ${scan.method ?? ''} ${scan.path ?? ''}`.trim());
+          } else {
+            const status = data.response_status ? ` (HTTP ${data.response_status})` : '';
+            setTestResult('error', `${data.message || 'Test failed'}${status}`);
+          }
+        } catch (_error) {
+          setTestResult('error', 'Test failed due to a network or server error.');
+        } finally {
+          testButton.disabled = false;
+        }
+      });
+    }
+
+    if (form && previewButton) {
+      previewButton.addEventListener('click', async () => {
+        setTestResult('info', 'Generating payload preview...');
+        previewButton.disabled = true;
+        try {
+          const payload = new FormData(form);
+          const response = await fetch('/webhooks/preview', {
+            method: 'POST',
+            body: payload,
+          });
+          const data = await response.json();
+          if (response.ok && data.ok) {
+            setPreview(data);
+            setTestResult('success', 'Payload preview generated.');
+          } else {
+            setTestResult('error', data.message || 'Preview generation failed.');
+          }
+        } catch (_error) {
+          setTestResult('error', 'Preview failed due to a network or server error.');
+        } finally {
+          previewButton.disabled = false;
+        }
+      });
+    }
+
+    refreshSummary();
+  })();
+</script>
+{% endblock %}
