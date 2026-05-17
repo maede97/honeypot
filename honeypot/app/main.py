@@ -47,12 +47,9 @@ def _extract_body_text(body: bytes) -> str:
 
 
 def _extract_client_ip(request: Request) -> str | None:
-    x_forwarded_for = request.headers.get("x-forwarded-for", "")
-    if x_forwarded_for:
-        # X-Forwarded-For can contain a comma-separated proxy chain.
-        first_ip = x_forwarded_for.split(",", 1)[0].strip()
-        if first_ip:
-            return first_ip
+    cf_connecting_ip = request.headers.get("cf-connecting-ip", "")
+    if cf_connecting_ip:
+        return cf_connecting_ip
 
     return request.client.host if request.client else None
 
