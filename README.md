@@ -9,6 +9,21 @@ Docker Compose setup for a scanner-attracting HTTP service exposed on a VPS IP a
 - Rolls up and prunes raw scan records older than 7 days while keeping daily/method totals for dashboards.
 - Exposes a GUI with login-protected browsing.
 
+## Images
+
+### Frontpage
+
+![Frontpage](images/frontpage.png)
+
+### Scans
+
+![Scans](images/scans.png)
+
+### Scan
+
+![Scan](images/scan.png)
+
+
 ## Services
 
 - `honeypot`: FastAPI app listening on container port `8000`, mapped to host `80`.
