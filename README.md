@@ -1,4 +1,4 @@
-# VPS Honey Scanner Logger
+# VPS Honeypot Scanner Logger
 
 Docker Compose setup for a scanner-attracting HTTP service exposed on a VPS IP address.
 
