@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}Honeypot GUI{% endblock %}</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('public', path='apple-touch-icon.png') }}" />
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('public', path='favicon-32x32.png') }}" />
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('public', path='favicon-16x16.png') }}" />
+    <link rel="icon" href="{{ url_for('public', path='favicon.ico') }}" />
+    <link rel="manifest" href="{{ url_for('public', path='site.webmanifest') }}" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

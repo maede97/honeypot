@@ -21,6 +21,7 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+app.mount("/public", StaticFiles(directory="app/public"), name="public")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 _db = Database(HONEYPOT_DB_PATH)
