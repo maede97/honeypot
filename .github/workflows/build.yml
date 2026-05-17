@@ -26,4 +26,4 @@ jobs:
         run: docker compose -f docker-compose.yml build
 
       - name: Push latest images
-        run: docker compose -f docker-compose.yml push
+        run: docker push ghcr.io/maede97/honeypot:latest && docker push ghcr.io/maede97/honeypot-gui:latest
