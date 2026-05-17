@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | Honeypot GUI{% endblock %}
+{% block content %}
+<section id="kpiCards" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  <article class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+    <h3 class="text-xs uppercase tracking-[0.18em] text-slate-300">Total Requests</h3>
+    <p id="kpiTotal" class="mt-3 font-semibold text-4xl font-bold text-sky-400">-</p>
+  </article>
+  <article class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+    <h3 class="text-xs uppercase tracking-[0.18em] text-slate-300">Last 24h</h3>
+    <p id="kpiLast24" class="mt-3 font-semibold text-4xl font-bold text-emerald-400">-</p>
+  </article>
+  <article class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+    <h3 class="text-xs uppercase tracking-[0.18em] text-slate-300">Unique Paths (raw)</h3>
+    <p id="kpiUnique" class="mt-3 font-semibold text-4xl font-bold text-amber-400">-</p>
+  </article>
+</section>
+
+<section class="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.65fr]">
+  <article class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+    <h2 class="text-xl font-semibold text-white">HTTP Method Split</h2>
+    <div class="mx-auto mt-4 w-full max-w-xs">
+      <div id="methodPieChart" aria-label="Method pie chart"></div>
+    </div>
+  </article>
+
+  <article class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+    <h2 class="text-xl font-semibold text-white">Traffic Heatmap (last 56 days)</h2>
+    <div id="dayHeatmapChart" class="mt-4"></div>
+  </article>
+</section>
+
+<section class="mt-5 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 shadow-2xl shadow-black/30">
+  <div class="border-b border-slate-700/70 px-5 py-4">
+    <h2 class="text-xl font-semibold text-white">Top Paths</h2>
+  </div>
+  <div class="overflow-x-auto">
+    <table id="topPathTable" class="min-w-full text-sm">
+      <thead class="bg-slate-800 text-left text-xs uppercase tracking-[0.16em] text-slate-300">
+        <tr><th class="px-5 py-3">Path</th><th class="px-5 py-3">Count</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  </div>
+</section>
+
+<section class="mt-5 rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+  <h2 class="text-xl font-semibold text-white">Daily Traffic (latest 14 days)</h2>
+  <div class="mt-4 grid gap-2" id="dailyBars"></div>
+</section>
+
+<style>
+  .apexcharts-tooltip,
+  .apexcharts-xaxistooltip,
+  .apexcharts-yaxistooltip {
+    background: #0f172a !important;
+    border: 1px solid #334155 !important;
+    color: #e2e8f0 !important;
+  }
+
+  .apexcharts-tooltip-title {
+    background: #1e293b !important;
+    border-bottom: 1px solid #334155 !important;
+    color: #e2e8f0 !important;
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+  const METHOD_COLORS = {
+    GET: '#2563eb',
+    POST: '#059669',
+    PUT: '#0ea5e9',
+    PATCH: '#14b8a6',
+    DELETE: '#b23a48',
+    HEAD: '#7c3aed',
+    OPTIONS: '#ea580c',
+  };
+
+  function createBar(day, count, max) {
+    const width = max > 0 ? Math.max((count / max) * 100, 2) : 2;
+    return `<div class="grid grid-cols-[110px_minmax(0,1fr)_56px] items-center gap-3 text-xs sm:text-sm"><span class="font-mono text-slate-300">${day}</span><div class="h-3 overflow-hidden rounded-full bg-slate-700"><div class="h-full rounded-full bg-gradient-to-r from-emerald-400 to-sky-400" style="width:${width}%"></div></div><strong class="text-right font-semibold text-slate-100">${count}</strong></div>`;
+  }
+
+  const pieChart = new ApexCharts(document.querySelector('#methodPieChart'), {
+    chart: {
+      type: 'donut',
+      height: 200,
+      toolbar: { show: false },
+      animations: { enabled: true },
+      foreColor: '#e9eef7',
+    },
+    series: [],
+    labels: [],
+    colors: [],
+    tooltip: {
+      theme: 'dark',
+      style: {
+        fontSize: '12px',
+      },
+    },
+    legend: {
+      position: 'bottom',
+      fontSize: '12px',
+    },
+    dataLabels: {
+      enabled: true,
+      formatter: (val) => `${val.toFixed(0)}%`,
+    },
+    stroke: {
+      width: 2,
+      colors: ['#0b1220'],
+    },
+    plotOptions: {
+      pie: {
+        donut: {
+          size: '60%',
+          labels: {
+            show: true,
+            total: {
+              show: true,
+              label: 'Hits',
+              formatter: (w) => w.globals.seriesTotals.reduce((a, b) => a + b, 0),
+            },
+          },
+        },
+      },
+    },
+    noData: {
+      text: 'No method data yet',
+    },
+  });
+
+  const heatmapChart = new ApexCharts(document.querySelector('#dayHeatmapChart'), {
+    chart: {
+      type: 'heatmap',
+      height: 290,
+      toolbar: { show: false },
+      foreColor: '#c9d3e3',
+    },
+    series: [],
+    xaxis: {
+      type: 'category',
+      labels: { rotate: 0 },
+    },
+    tooltip: {
+      theme: 'dark',
+      style: {
+        fontSize: '12px',
+      },
+    },
+    yaxis: {
+      labels: { style: { fontSize: '12px' } },
+    },
+    dataLabels: { enabled: false },
+    legend: { show: false },
+    plotOptions: {
+      heatmap: {
+        shadeIntensity: 0.55,
+        radius: 3,
+        colorScale: {
+          ranges: [
+            { from: 0, to: 0, color: '#1e334c', name: '0' },
+            { from: 1, to: 10, color: '#3394ff', name: '1-10' },
+            { from: 11, to: 50, color: '#2fcf88', name: '11-50' },
+            { from: 51, to: 200, color: '#14b86b', name: '51-200' },
+            { from: 201, to: 1000000000, color: '#f59f0b', name: '200+' },
+          ],
+        },
+      },
+    },
+    noData: {
+      text: 'No traffic data yet',
+    },
+  });
+
+  pieChart.render();
+  heatmapChart.render();
+
+  function renderMethodPie(methodCounts) {
+    const labels = methodCounts.map((item) => item.method);
+    const series = methodCounts.map((item) => item.count);
+    const colors = labels.map((label) => METHOD_COLORS[label] || '#475569');
+
+    pieChart.updateOptions({
+      labels,
+      colors,
+    });
+    pieChart.updateSeries(series);
+  }
+
+  function isoDay(date) {
+    return date.toISOString().slice(0, 10);
+  }
+
+  function buildHeatmapSeries(daily) {
+    const countByDay = Object.fromEntries(daily.map((entry) => [entry.day, entry.count]));
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const weekMap = new Map();
+    const today = new Date();
+
+    for (let i = 55; i >= 0; i -= 1) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+
+      const weekdayIndex = (d.getDay() + 6) % 7;
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - weekdayIndex);
+      const weekLabel = monday.toISOString().slice(5, 10);
+
+      if (!weekMap.has(weekLabel)) {
+        weekMap.set(weekLabel, new Array(7).fill(0));
+      }
+      weekMap.get(weekLabel)[weekdayIndex] = countByDay[isoDay(d)] || 0;
+    }
+
+    const weekLabels = [...weekMap.keys()];
+    const series = weekdays.map((day, dayIndex) => ({
+      name: day,
+      data: weekLabels.map((weekLabel) => ({
+        x: weekLabel,
+        y: weekMap.get(weekLabel)[dayIndex],
+      })),
+    }));
+
+    return { series, weekLabels };
+  }
+
+  function renderHeatmap(daily) {
+    const { series, weekLabels } = buildHeatmapSeries(daily || []);
+    heatmapChart.updateOptions({
+      xaxis: { categories: weekLabels },
+    });
+    heatmapChart.updateSeries(series);
+  }
+
+  async function loadStats() {
+    const response = await fetch('/api/stats');
+    if (!response.ok) {
+      return;
+    }
+
+    const data = await response.json();
+    document.getElementById('kpiTotal').textContent = data.total;
+    document.getElementById('kpiLast24').textContent = data.last_24h;
+    document.getElementById('kpiUnique').textContent = data.unique_paths;
+    renderMethodPie(data.method_counts || []);
+    renderHeatmap(data.daily || []);
+
+    const body = document.querySelector('#topPathTable tbody');
+    body.innerHTML = data.top_paths
+      .map((item) => `<tr class="border-t border-slate-700/60"><td class="max-w-0 truncate px-5 py-3 font-mono text-slate-100">${item.path}</td><td class="px-5 py-3 font-semibold text-slate-200">${item.count}</td></tr>`)
+      .join('');
+
+    const recent = (data.daily || []).slice(-14);
+    const max = Math.max(...recent.map((d) => d.count), 0);
+    document.getElementById('dailyBars').innerHTML = recent
+      .map((d) => createBar(d.day, d.count, max))
+      .join('');
+  }
+
+  loadStats();
+</script>
+{% endblock %}

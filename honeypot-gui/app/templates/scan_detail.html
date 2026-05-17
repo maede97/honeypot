@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Scan {{ scan.id }} | Honeypot GUI{% endblock %}
+{% block content %}
+{% if scan.method == "GET" %}
+{% set method_classes = "bg-sky-400/20 text-sky-400 border-sky-400/50" %}
+{% elif scan.method in ["POST", "PUT", "PATCH"] %}
+{% set method_classes = "bg-emerald-400/20 text-emerald-400 border-emerald-400/50" %}
+{% elif scan.method == "DELETE" %}
+{% set method_classes = "bg-rose-400/20 text-rose-400 border-rose-400/50" %}
+{% elif scan.method == "HEAD" %}
+{% set method_classes = "bg-violet-400/20 text-violet-300 border-violet-400/50" %}
+{% elif scan.method == "OPTIONS" %}
+{% set method_classes = "bg-amber-400/20 text-amber-400 border-amber-400/50" %}
+{% else %}
+{% set method_classes = "bg-slate-700/30 text-slate-200 border-slate-500/60" %}
+{% endif %}
+
+<section class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+  <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-700/70 pb-4">
+    <div>
+      <p class="text-xs uppercase tracking-[0.2em] text-slate-300">Event Record</p>
+      <h2 class="mt-1 font-semibold text-2xl font-bold text-white">Scan #{{ scan.id }}</h2>
+    </div>
+    <span class="inline-flex rounded-full border px-3 py-1 text-xs font-semibold {{ method_classes }}">{{ scan.method }}</span>
+  </div>
+
+  <dl class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3">
+      <dt class="text-xs uppercase tracking-[0.16em] text-slate-300">Timestamp</dt>
+      <dd class="mt-1 font-mono text-sm text-slate-100">{{ scan.ts }}</dd>
+    </div>
+    <div class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3">
+      <dt class="text-xs uppercase tracking-[0.16em] text-slate-300">Client IP</dt>
+      <dd class="mt-1 font-mono text-sm text-slate-100">{{ scan.client_ip or "-" }}</dd>
+    </div>
+    <div class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3">
+      <dt class="text-xs uppercase tracking-[0.16em] text-slate-300">Body Size</dt>
+      <dd class="mt-1 font-mono text-sm text-slate-100">{{ scan.body_size }}</dd>
+    </div>
+    <div class="md:col-span-2 xl:col-span-3">
+      <dt class="mb-1 text-xs uppercase tracking-[0.16em] text-slate-300">Path</dt>
+      <div
+        data-copy-field
+        tabindex="0"
+        role="button"
+        class="flex w-full items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 transition hover:border-sky-400/70 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
+      >
+        <span data-copy-source class="min-w-0 flex-1 truncate font-mono text-sm text-slate-100">{{ scan.path }}</span>
+        <span data-copy-feedback class="text-xs font-semibold uppercase tracking-wide opacity-0 transition">Copied</span>
+      </div>
+    </div>
+    <div class="md:col-span-2 xl:col-span-3">
+      <dt class="mb-1 text-xs uppercase tracking-[0.16em] text-slate-300">Query</dt>
+      {% if scan.query_string %}
+      <div
+        data-copy-field
+        tabindex="0"
+        role="button"
+        class="flex w-full items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 transition hover:border-sky-400/70 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
+      >
+        <span data-copy-source class="min-w-0 flex-1 truncate font-mono text-sm text-slate-100">{{ scan.query_string }}</span>
+        <span data-copy-feedback class="text-xs font-semibold uppercase tracking-wide opacity-0 transition">Copied</span>
+      </div>
+      {% else %}
+      <dd class="rounded-xl border border-dashed border-slate-700 px-4 py-3 text-sm text-slate-300">No query string.</dd>
+      {% endif %}
+    </div>
+    <div class="md:col-span-2 xl:col-span-3">
+      <dt class="mb-1 text-xs uppercase tracking-[0.16em] text-slate-300">User Agent</dt>
+      {% if scan.user_agent %}
+      <div
+        data-copy-field
+        tabindex="0"
+        role="button"
+        class="flex w-full items-center gap-3 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 transition hover:border-sky-400/70 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
+      >
+        <span data-copy-source class="min-w-0 flex-1 truncate text-sm text-slate-100">{{ scan.user_agent }}</span>
+        <span data-copy-feedback class="text-xs font-semibold uppercase tracking-wide opacity-0 transition">Copied</span>
+      </div>
+      {% else %}
+      <dd class="rounded-xl border border-dashed border-slate-700 px-4 py-3 text-sm text-slate-300">No user agent.</dd>
+      {% endif %}
+    </div>
+  </dl>
+</section>
+
+<section class="mt-5 rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+  <div class="mb-3 flex items-center justify-between gap-3">
+    <h2 class="text-xl font-semibold text-white">Request Body</h2>
+    <span class="rounded-full border border-slate-600 px-2.5 py-1 text-xs uppercase tracking-[0.14em] text-slate-300">click to copy</span>
+  </div>
+  {% if scan.body_text %}
+  <div
+    data-copy-field
+    tabindex="0"
+    role="button"
+    class="group overflow-hidden rounded-xl border border-slate-700 bg-slate-800 transition hover:border-sky-400/70 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
+  >
+    <div class="flex items-center justify-between border-b border-slate-700/80 px-3 py-2 text-xs uppercase tracking-[0.16em] text-slate-300">
+      <span>Raw payload</span>
+      <span data-copy-feedback class="font-semibold opacity-0 transition">Copied</span>
+    </div>
+    <pre data-copy-source class="max-h-80 overflow-auto px-3 py-3 font-mono text-xs text-slate-100">{{ scan.body_text }}</pre>
+  </div>
+  {% else %}
+  <p class="rounded-xl border border-dashed border-slate-700 px-4 py-3 text-sm text-slate-300">No request body captured.</p>
+  {% endif %}
+</section>
+
+<section class="mt-5 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 shadow-2xl shadow-black/30">
+  <div class="flex items-center justify-between gap-3 border-b border-slate-700/70 bg-slate-800 px-5 py-4">
+    <h2 class="text-xl font-semibold text-white">Headers</h2>
+    <span class="rounded-full border border-slate-600 px-2.5 py-1 text-xs uppercase tracking-[0.14em] text-slate-300">{{ scan.headers|length }} fields</span>
+  </div>
+  <div class="grid gap-2 bg-slate-900/70 p-3">
+    {% for key, value in scan.headers.items() %}
+    <article class="grid gap-2 rounded-xl border border-slate-700 bg-slate-800 p-3 md:grid-cols-[minmax(180px,250px)_minmax(0,1fr)] md:items-center">
+      <div class="rounded-lg border border-slate-700/80 bg-slate-900 px-3 py-2 font-mono text-xs uppercase tracking-[0.1em] text-slate-200">
+        {{ key }}
+      </div>
+      <div
+        data-copy-field
+        tabindex="0"
+        role="button"
+        class="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 transition hover:border-sky-400/70 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
+      >
+        <span data-copy-source class="min-w-0 flex-1 truncate font-mono text-xs text-slate-100">{{ value }}</span>
+        <span data-copy-feedback class="text-xs font-semibold uppercase tracking-wide opacity-0 transition">Copied</span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Honeypot GUI{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% block head_extra %}{% endblock %}
+  </head>
+  <body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
+    <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+      <div class="absolute -left-32 top-0 h-96 w-96 rounded-full bg-sky-500/20 blur-3xl"></div>
+      <div class="absolute right-0 top-1/3 h-[26rem] w-[26rem] rounded-full bg-emerald-500/15 blur-3xl"></div>
+      <div class="absolute bottom-0 left-1/4 h-80 w-80 rounded-full bg-amber-500/15 blur-3xl"></div>
+    </div>
+
+    <header class="border-b border-slate-700/60 bg-slate-900/80 backdrop-blur">
+      <div class="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-4 px-4 py-4 sm:px-6 lg:px-8">
+        <a href="/" class="text-lg font-bold tracking-wide text-white">Honeypot GUI</a>
+
+        <nav class="flex items-center gap-2 text-sm text-slate-200 sm:gap-3">
+          <a
+            href="/"
+            class="rounded-md border border-slate-700/80 bg-slate-800/70 px-3 py-1.5 transition hover:border-slate-300 hover:text-white"
+          >
+            Dashboard
+          </a>
+          <a
+            href="/scans"
+            class="rounded-md border border-slate-700/80 bg-slate-800/70 px-3 py-1.5 transition hover:border-slate-300 hover:text-white"
+          >
+            Scans
+          </a>
+        </nav>
+
+        <form method="post" action="/logout" class="ml-auto">
+          <button
+            type="submit"
+            class="rounded-md border border-amber-400/60 bg-amber-400/20 px-3 py-1.5 text-sm font-semibold text-amber-300 transition hover:bg-amber-400/30"
+          >
+            Logout
+          </button>
+        </form>
+      </div>
+    </header>
+
+    <main class="{% block main_class %}mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8{% endblock %}">{% block content %}{% endblock %}</main>
+
+    <script>
+      async function copyTextToClipboard(text) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (_err) {
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.setAttribute('readonly', '');
+          textarea.style.position = 'absolute';
+          textarea.style.left = '-9999px';
+          document.body.appendChild(textarea);
+          textarea.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(textarea);
+          return ok;
+        }
+      }
+
+      function setCopyFeedback(container, ok) {
+        const feedback = container.querySelector('[data-copy-feedback]');
+        if (!feedback) {
+          return;
+        }
+
+        feedback.textContent = ok ? 'Copied' : 'Failed';
+        feedback.classList.remove('opacity-0');
+        feedback.classList.add(ok ? 'text-emerald-400' : 'text-rose-400');
+
+        clearTimeout(container._copyFeedbackTimeout);
+        container._copyFeedbackTimeout = setTimeout(() => {
+          feedback.classList.add('opacity-0');
+          feedback.classList.remove('text-emerald-400', 'text-rose-400');
+        }, 1200);
+      }
+
+      function wireCopyField(container) {
+        if (container.dataset.copyWired === 'true') {
+          return;
+        }
+
+        container.dataset.copyWired = 'true';
+        const trigger = async () => {
+          const source = container.querySelector('[data-copy-source]');
+          if (!source) {
+            return;
+          }
+          const ok = await copyTextToClipboard(source.textContent || '');
+          setCopyFeedback(container, ok);
+        };
+
+        container.addEventListener('click', trigger);
+        container.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            trigger();
+          }
+        });
+      }
+
+      function bindCopyFields(root = document) {
+        root.querySelectorAll('[data-copy-field]').forEach(wireCopyField);
+      }
+
+      window.copyTextToClipboard = copyTextToClipboard;
+      window.bindCopyFields = bindCopyFields;
+
+      document.addEventListener('DOMContentLoaded', () => {
+        bindCopyFields();
+      });
+    </script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>
