@@ -51,6 +51,15 @@ def _extract_client_ip(request: Request) -> str | None:
     if cf_connecting_ip:
         return cf_connecting_ip
 
+    x_real_ip = request.headers.get("x-real-ip", "")
+    if x_real_ip:
+        return x_real_ip
+
+    x_forwarded_for = request.headers.get("x-forwarded-for", "")
+    if x_forwarded_for:
+        # x-forwarded-for can contain multiple IPs, the first one is the original client
+        return x_forwarded_for.split(",")[0].strip()
+
     return request.client.host if request.client else None
 
 
