@@ -517,6 +517,7 @@ class WebhookDispatcher:
                 webhook_id=0,
                 webhook_name=name,
                 scan=scan,
+                burst_count=scan.get("burst_count", 0),
             )
         except Exception as exc:
             return {
@@ -608,16 +609,23 @@ class WebhookDispatcher:
                 ).fetchall()
 
             row = None
+            burst_count = 0
             for candidate in rows:
-                if burst_enabled and not self._matches_burst_condition(
-                    conn,
-                    row=candidate,
-                    burst_packets=normalized_burst_packets,
-                    burst_window_seconds=normalized_burst_window,
-                ):
-                    continue
-                row = candidate
-                break
+                if burst_enabled:
+                    count = self._matches_burst_condition(
+                        conn,
+                        row=candidate,
+                        burst_packets=normalized_burst_packets,
+                        burst_window_seconds=normalized_burst_window,
+                    )
+                    if not count:
+                        continue
+                    row = candidate
+                    burst_count = count
+                    break
+                else:
+                    row = candidate
+                    break
 
         if row is None:
             return None
@@ -648,6 +656,7 @@ class WebhookDispatcher:
                 if row["query_string"]
                 else str(row["path"])
             ),
+            "burst_count": burst_count,
         }
 
     def _matches_burst_condition(
@@ -657,16 +666,17 @@ class WebhookDispatcher:
         row: sqlite3.Row,
         burst_packets: int,
         burst_window_seconds: int,
-    ) -> bool:
+    ) -> int:
+        """Return the packet count in the burst window, or 0 if the condition is not met."""
         client_ip = str(row["client_ip"]) if row["client_ip"] else ""
         if not client_ip:
-            return False
+            return 0
 
         ts_text = str(row["ts"])
         try:
             ts_dt = datetime.fromisoformat(ts_text)
         except ValueError:
-            return False
+            return 0
 
         window_start = (ts_dt - timedelta(seconds=burst_window_seconds)).isoformat(timespec="seconds")
         count_row = conn.execute(
@@ -680,7 +690,7 @@ class WebhookDispatcher:
             (client_ip, window_start, ts_text),
         ).fetchone()
         count = int(count_row["cnt"]) if count_row else 0
-        return count >= burst_packets
+        return count if count >= burst_packets else 0
 
     def _render_payload(self, *, webhook: WebhookRow, scan: dict[str, Any]) -> Any:
         return self._render_payload_from_values(
@@ -688,6 +698,7 @@ class WebhookDispatcher:
             webhook_id=webhook.id,
             webhook_name=webhook.name,
             scan=scan,
+            burst_count=scan.get("burst_count", 0),
         )
 
     def _render_payload_from_values(
@@ -697,11 +708,13 @@ class WebhookDispatcher:
         webhook_id: int,
         webhook_name: str,
         scan: dict[str, Any],
+        burst_count: int = 0,
     ) -> Any:
         template = self._jinja.from_string(payload_template)
         rendered = template.render(
             scan=scan,
             now=_utc_now_iso(),
             webhook={"id": webhook_id, "name": webhook_name},
+            burst={"count": burst_count},
         )
         return json.loads(rendered)
