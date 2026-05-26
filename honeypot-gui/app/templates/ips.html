@@ -13,7 +13,14 @@
   {% for item in top_hitters %}
   <article class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
     <h3 class="text-xs uppercase tracking-[0.18em] text-slate-300">Top {{ loop.index }}</h3>
-    <p class="mt-3 break-all font-mono text-sm text-slate-100">{{ item.client_ip }}</p>
+    <p class="mt-3 break-all font-mono text-sm text-slate-100">
+      <a
+        href="https://ipinfo.io/{{ item.client_ip | urlencode }}"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="underline decoration-slate-500 underline-offset-2 transition hover:text-sky-300"
+      >{{ item.client_ip }}</a>
+    </p>
     <p class="mt-2 text-2xl font-bold text-sky-400">{{ item.hits }}</p>
   </article>
   {% endfor %}
@@ -56,7 +63,14 @@
       <tbody>
         {% for row in rows %}
         <tr class="border-t border-slate-700/60 text-slate-200">
-          <td class="break-all px-5 py-3 font-mono text-xs">{{ row.client_ip }}</td>
+          <td class="break-all px-5 py-3 font-mono text-xs">
+            <a
+              href="https://ipinfo.io/{{ row.client_ip | urlencode }}"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="underline decoration-slate-500 underline-offset-2 transition hover:text-sky-300"
+            >{{ row.client_ip }}</a>
+          </td>
           <td class="px-5 py-3 font-semibold text-sky-300">{{ row.hits }}</td>
           <td class="px-5 py-3">{{ row.geo.country or "-" }}</td>
           <td class="px-5 py-3">{{ row.geo.region or "-" }}{% if row.geo.city %} / {{ row.geo.city }}{% endif %}</td>
@@ -115,7 +129,7 @@
       weight: 1.2,
     }).addTo(map);
     marker.bindPopup(
-      `<strong>${point.client_ip}</strong><br/>Hits: ${point.hits}<br/>${point.country || '-'}${point.city ? ` / ${point.city}` : ''}`,
+      `<strong><a href="https://ipinfo.io/${encodeURIComponent(point.client_ip)}" target="_blank" rel="noopener noreferrer">${point.client_ip}</a></strong><br/>Hits: ${point.hits}<br/>${point.country || '-'}${point.city ? ` / ${point.city}` : ''}`,
     );
     bounds.push([point.lat, point.lon]);
   });
