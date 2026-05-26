@@ -66,19 +66,22 @@
           <input type="color" name="zero_color" value="{{ heatmap_colors.ZERO }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
         </label>
         <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
-          1-10
+          1-{{ heatmap_thresholds.LOW_MAX }}
           <input type="color" name="low_color" value="{{ heatmap_colors.LOW }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+          <input type="number" name="low_max" min="1" value="{{ heatmap_thresholds.LOW_MAX }}" class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400" />
         </label>
         <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
-          11-50
+          {{ heatmap_thresholds.LOW_MAX + 1 }}-{{ heatmap_thresholds.MEDIUM_MAX }}
           <input type="color" name="medium_color" value="{{ heatmap_colors.MEDIUM }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+          <input type="number" name="medium_max" min="{{ heatmap_thresholds.LOW_MAX + 1 }}" value="{{ heatmap_thresholds.MEDIUM_MAX }}" class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400" />
         </label>
         <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
-          51-200
+          {{ heatmap_thresholds.MEDIUM_MAX + 1 }}-{{ heatmap_thresholds.HIGH_MAX }}
           <input type="color" name="high_color" value="{{ heatmap_colors.HIGH }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+          <input type="number" name="high_max" min="{{ heatmap_thresholds.MEDIUM_MAX + 1 }}" value="{{ heatmap_thresholds.HIGH_MAX }}" class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400" />
         </label>
         <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
-          200+
+          {{ heatmap_thresholds.HIGH_MAX + 1 }}+
           <input type="color" name="very_high_color" value="{{ heatmap_colors.VERY_HIGH }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
         </label>
         <div class="sm:col-span-2 lg:col-span-5">

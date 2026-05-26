@@ -69,6 +69,7 @@
 <script>
   const METHOD_COLORS = {{ method_colors | tojson }};
   const HEATMAP_COLORS = {{ heatmap_colors | tojson }};
+  const HEATMAP_THRESHOLDS = {{ heatmap_thresholds | tojson }};
 
   function createBar(day, count, max) {
     const width = max > 0 ? Math.max((count / max) * 100, 2) : 2;
@@ -154,10 +155,25 @@
         colorScale: {
           ranges: [
             { from: 0, to: 0, color: HEATMAP_COLORS.ZERO, name: '0' },
-            { from: 1, to: 10, color: HEATMAP_COLORS.LOW, name: '1-10' },
-            { from: 11, to: 50, color: HEATMAP_COLORS.MEDIUM, name: '11-50' },
-            { from: 51, to: 200, color: HEATMAP_COLORS.HIGH, name: '51-200' },
-            { from: 201, to: 1000000000, color: HEATMAP_COLORS.VERY_HIGH, name: '200+' },
+            { from: 1, to: HEATMAP_THRESHOLDS.LOW_MAX, color: HEATMAP_COLORS.LOW, name: `1-${HEATMAP_THRESHOLDS.LOW_MAX}` },
+            {
+              from: HEATMAP_THRESHOLDS.LOW_MAX + 1,
+              to: HEATMAP_THRESHOLDS.MEDIUM_MAX,
+              color: HEATMAP_COLORS.MEDIUM,
+              name: `${HEATMAP_THRESHOLDS.LOW_MAX + 1}-${HEATMAP_THRESHOLDS.MEDIUM_MAX}`,
+            },
+            {
+              from: HEATMAP_THRESHOLDS.MEDIUM_MAX + 1,
+              to: HEATMAP_THRESHOLDS.HIGH_MAX,
+              color: HEATMAP_COLORS.HIGH,
+              name: `${HEATMAP_THRESHOLDS.MEDIUM_MAX + 1}-${HEATMAP_THRESHOLDS.HIGH_MAX}`,
+            },
+            {
+              from: HEATMAP_THRESHOLDS.HIGH_MAX + 1,
+              to: 1000000000,
+              color: HEATMAP_COLORS.VERY_HIGH,
+              name: `${HEATMAP_THRESHOLDS.HIGH_MAX + 1}+`,
+            },
           ],
         },
       },
