@@ -30,6 +30,7 @@ WEBHOOK_METHODS = ["", "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS
 WEBHOOK_OPERATORS = ["equals", "contains"]
 METHOD_COLOR_SETTING_KEY = "dashboard_method_colors"
 HEATMAP_COLOR_SETTING_KEY = "dashboard_heatmap_colors"
+HEATMAP_THRESHOLD_SETTING_KEY = "dashboard_heatmap_thresholds"
 DEFAULT_METHOD_COLORS = {
     "GET": "#2563eb",
     "POST": "#059669",
@@ -45,6 +46,11 @@ DEFAULT_HEATMAP_COLORS = {
     "MEDIUM": "#2fcf88",
     "HIGH": "#14b86b",
     "VERY_HIGH": "#f59f0b",
+}
+DEFAULT_HEATMAP_THRESHOLDS = {
+    "LOW_MAX": 10,
+    "MEDIUM_MAX": 50,
+    "HIGH_MAX": 200,
 }
 
 _db = Database(HONEYPOT_DB_PATH)
@@ -215,6 +221,44 @@ def _load_heatmap_colors() -> dict[str, str]:
     }
 
 
+def _normalize_heatmap_thresholds(
+    submitted: dict[str, str],
+    *,
+    defaults: dict[str, int],
+) -> dict[str, int]:
+    def _parse_int(name: str, minimum: int) -> int:
+        candidate = submitted.get(name, "").strip()
+        if not candidate:
+            return defaults[name]
+        try:
+            parsed = int(candidate)
+        except ValueError:
+            return defaults[name]
+        if parsed < minimum:
+            return defaults[name]
+        return parsed
+
+    low_max = _parse_int("LOW_MAX", 1)
+    medium_max = _parse_int("MEDIUM_MAX", low_max + 1)
+    high_max = _parse_int("HIGH_MAX", medium_max + 1)
+
+    if medium_max <= low_max:
+        medium_max = max(defaults["MEDIUM_MAX"], low_max + 1)
+    if high_max <= medium_max:
+        high_max = max(defaults["HIGH_MAX"], medium_max + 1)
+
+    return {
+        "LOW_MAX": low_max,
+        "MEDIUM_MAX": medium_max,
+        "HIGH_MAX": high_max,
+    }
+
+
+def _load_heatmap_thresholds() -> dict[str, int]:
+    saved_thresholds = _webhook_store.get_json_setting(HEATMAP_THRESHOLD_SETTING_KEY)
+    return _normalize_heatmap_thresholds(saved_thresholds, defaults=DEFAULT_HEATMAP_THRESHOLDS)
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
@@ -265,6 +309,7 @@ async def dashboard(request: Request):
         context={
             "method_colors": _load_method_colors(),
             "heatmap_colors": _load_heatmap_colors(),
+            "heatmap_thresholds": _load_heatmap_thresholds(),
         },
     )
 
@@ -296,6 +341,7 @@ async def settings_page(request: Request, msg: str = Query(default="")):
             "message": msg,
             "method_colors": _load_method_colors(),
             "heatmap_colors": _load_heatmap_colors(),
+            "heatmap_thresholds": _load_heatmap_thresholds(),
             "filter_fields": WEBHOOK_FILTER_FIELDS,
             "filter_methods": WEBHOOK_METHODS,
             "filter_operators": WEBHOOK_OPERATORS,
@@ -434,6 +480,9 @@ async def settings_heatmap_colors(
     medium_color: str = Form(default=""),
     high_color: str = Form(default=""),
     very_high_color: str = Form(default=""),
+    low_max: str = Form(default=""),
+    medium_max: str = Form(default=""),
+    high_max: str = Form(default=""),
 ):
     _ = request
     submitted = {
@@ -447,7 +496,19 @@ async def settings_heatmap_colors(
         bucket: _normalize_hex_color(submitted.get(bucket, ""), default)
         for bucket, default in DEFAULT_HEATMAP_COLORS.items()
     }
+    thresholds = _normalize_heatmap_thresholds(
+        {
+            "LOW_MAX": low_max,
+            "MEDIUM_MAX": medium_max,
+            "HIGH_MAX": high_max,
+        },
+        defaults=_load_heatmap_thresholds(),
+    )
     _webhook_store.set_json_setting(HEATMAP_COLOR_SETTING_KEY, colors)
+    _webhook_store.set_json_setting(
+        HEATMAP_THRESHOLD_SETTING_KEY,
+        {name: str(value) for name, value in thresholds.items()},
+    )
     return RedirectResponse(url="/settings?msg=Settings+updated", status_code=303)
 
 
