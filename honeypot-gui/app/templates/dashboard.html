@@ -67,15 +67,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <script>
-  const METHOD_COLORS = {
-    GET: '#2563eb',
-    POST: '#059669',
-    PUT: '#0ea5e9',
-    PATCH: '#14b8a6',
-    DELETE: '#b23a48',
-    HEAD: '#7c3aed',
-    OPTIONS: '#ea580c',
-  };
+  const METHOD_COLORS = {{ method_colors | tojson }};
+  const HEATMAP_COLORS = {{ heatmap_colors | tojson }};
 
   function createBar(day, count, max) {
     const width = max > 0 ? Math.max((count / max) * 100, 2) : 2;
@@ -160,11 +153,11 @@
         radius: 3,
         colorScale: {
           ranges: [
-            { from: 0, to: 0, color: '#1e334c', name: '0' },
-            { from: 1, to: 10, color: '#3394ff', name: '1-10' },
-            { from: 11, to: 50, color: '#2fcf88', name: '11-50' },
-            { from: 51, to: 200, color: '#14b86b', name: '51-200' },
-            { from: 201, to: 1000000000, color: '#f59f0b', name: '200+' },
+            { from: 0, to: 0, color: HEATMAP_COLORS.ZERO, name: '0' },
+            { from: 1, to: 10, color: HEATMAP_COLORS.LOW, name: '1-10' },
+            { from: 11, to: 50, color: HEATMAP_COLORS.MEDIUM, name: '11-50' },
+            { from: 51, to: 200, color: HEATMAP_COLORS.HIGH, name: '51-200' },
+            { from: 201, to: 1000000000, color: HEATMAP_COLORS.VERY_HIGH, name: '200+' },
           ],
         },
       },

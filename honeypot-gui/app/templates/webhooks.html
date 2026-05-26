@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Webhooks | Honeypot GUI{% endblock %}
+{% block title %}Settings | Honeypot GUI{% endblock %}
 {% block content %}
 <section class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
   <div class="flex flex-wrap items-center justify-between gap-3">
-    <h1 class="text-2xl font-bold text-white">Webhooks</h1>
+    <h1 class="text-2xl font-bold text-white">Settings</h1>
     <span class="rounded-lg border border-slate-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-300">{{ webhooks|length }} configured</span>
   </div>
 
@@ -12,6 +12,88 @@
     {{ message }}
   </div>
   {% endif %}
+
+  <div class="mt-5 grid gap-5">
+    <article class="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4">
+      <h2 class="text-lg font-semibold text-white">Dashboard Method Colors</h2>
+      <p class="mt-2 text-sm text-slate-300">Customize the HTTP method pie chart colors shown on the dashboard.</p>
+      <form method="post" action="/settings/method-colors" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          GET
+          <input type="color" name="get_color" value="{{ method_colors.GET }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          POST
+          <input type="color" name="post_color" value="{{ method_colors.POST }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          PUT
+          <input type="color" name="put_color" value="{{ method_colors.PUT }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          PATCH
+          <input type="color" name="patch_color" value="{{ method_colors.PATCH }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          DELETE
+          <input type="color" name="delete_color" value="{{ method_colors.DELETE }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          HEAD
+          <input type="color" name="head_color" value="{{ method_colors.HEAD }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          OPTIONS
+          <input type="color" name="options_color" value="{{ method_colors.OPTIONS }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <div class="sm:col-span-2 lg:col-span-4">
+          <button
+            type="submit"
+            class="rounded-xl border border-sky-400/70 bg-sky-400/20 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-400/30"
+          >
+            Save Colors
+          </button>
+        </div>
+      </form>
+    </article>
+
+    <article class="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4">
+      <h2 class="text-lg font-semibold text-white">Dashboard Heatmap Colors</h2>
+      <p class="mt-2 text-sm text-slate-300">Customize the traffic heatmap colors shown on the dashboard.</p>
+      <form method="post" action="/settings/heatmap-colors" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          0
+          <input type="color" name="zero_color" value="{{ heatmap_colors.ZERO }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          1-10
+          <input type="color" name="low_color" value="{{ heatmap_colors.LOW }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          11-50
+          <input type="color" name="medium_color" value="{{ heatmap_colors.MEDIUM }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          51-200
+          <input type="color" name="high_color" value="{{ heatmap_colors.HIGH }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          200+
+          <input type="color" name="very_high_color" value="{{ heatmap_colors.VERY_HIGH }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <div class="sm:col-span-2 lg:col-span-5">
+          <button
+            type="submit"
+            class="rounded-xl border border-sky-400/70 bg-sky-400/20 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-400/30"
+          >
+            Save Colors
+          </button>
+        </div>
+      </form>
+    </article>
+
+    <h2 class="text-xl font-semibold text-white">Webhooks</h2>
+  </div>
 
   <div class="mt-5 grid gap-5 lg:grid-cols-2">
     <article class="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4">
