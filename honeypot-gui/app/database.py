@@ -18,6 +18,14 @@ class ScanRow:
     body_size: int
 
 
+@dataclass
+class IPAggregateRow:
+    client_ip: str
+    hits: int
+    first_seen: str
+    last_seen: str
+
+
 class Database:
     def __init__(self, db_path: str) -> None:
         self._uri = f"file:{db_path}?mode=ro"
@@ -111,6 +119,80 @@ class Database:
         ]
 
         return scans, int(total_row["cnt"] if total_row else 0)
+
+    def list_ip_overview(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        ip_filter: str,
+    ) -> tuple[Sequence[IPAggregateRow], int]:
+        where = ["COALESCE(client_ip, '') <> ''"]
+        params: list[str] = []
+
+        if ip_filter:
+            where.append("client_ip LIKE ?")
+            params.append(f"%{ip_filter}%")
+
+        where_sql = "WHERE " + " AND ".join(where)
+        offset = (page - 1) * page_size
+
+        with self._connect() as conn:
+            total_row = conn.execute(
+                f"""
+                SELECT COUNT(*) AS cnt
+                FROM (
+                    SELECT client_ip
+                    FROM scans
+                    {where_sql}
+                    GROUP BY client_ip
+                ) grouped
+                """,
+                params,
+            ).fetchone()
+
+            rows = conn.execute(
+                f"""
+                SELECT
+                    client_ip,
+                    COUNT(*) AS hits,
+                    MIN(ts) AS first_seen,
+                    MAX(ts) AS last_seen
+                FROM scans
+                {where_sql}
+                GROUP BY client_ip
+                ORDER BY hits DESC, client_ip ASC
+                LIMIT ? OFFSET ?
+                """,
+                [*params, page_size, offset],
+            ).fetchall()
+
+        ip_rows = [
+            IPAggregateRow(
+                client_ip=str(r["client_ip"]),
+                hits=int(r["hits"]),
+                first_seen=str(r["first_seen"]),
+                last_seen=str(r["last_seen"]),
+            )
+            for r in rows
+        ]
+        return ip_rows, int(total_row["cnt"] if total_row else 0)
+
+    def top_ip_hitters(self, *, limit: int = 10) -> list[dict]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT client_ip, COUNT(*) AS hits
+                FROM scans
+                WHERE COALESCE(client_ip, '') <> ''
+                GROUP BY client_ip
+                ORDER BY hits DESC, client_ip ASC
+                LIMIT ?
+                """,
+                (max(1, min(limit, 1000)),),
+            ).fetchall()
+
+        return [{"client_ip": str(row["client_ip"]), "hits": int(row["hits"])} for row in rows]
 
     def get_scan(self, scan_id: int) -> dict | None:
         with self._connect() as conn:
