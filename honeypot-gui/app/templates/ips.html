@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}IPs | Honeypot GUI{% endblock %}
+{% block head_extra %}
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin=""
+/>
+{% endblock %}
+{% block content %}
+<section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+  {% for item in top_hitters %}
+  <article class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+    <h3 class="text-xs uppercase tracking-[0.18em] text-slate-300">Top {{ loop.index }}</h3>
+    <p class="mt-3 break-all font-mono text-sm text-slate-100">{{ item.client_ip }}</p>
+    <p class="mt-2 text-2xl font-bold text-sky-400">{{ item.hits }}</p>
+  </article>
+  {% endfor %}
+</section>
+
+<section class="mt-5 rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+  <h2 class="text-xl font-semibold text-white">IP Filters</h2>
+  <form method="get" action="/ips" class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+    <input
+      type="text"
+      name="ip"
+      value="{{ ip_filter }}"
+      placeholder="Filter by IP substring"
+      class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
+    />
+    <button type="submit" class="rounded-xl border border-sky-400/70 bg-sky-400/20 px-4 py-2 text-sm font-semibold text-sky-400 transition hover:bg-sky-400/30">
+      Apply
+    </button>
+  </form>
+</section>
+
+<section class="mt-5 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 shadow-2xl shadow-black/30">
+  {% set prev_page = page - 1 %}
+  {% set next_page = page + 1 %}
+  <div class="border-b border-slate-700/70 px-5 py-4">
+    <h2 class="text-xl font-semibold text-white">Stored IPs ({{ total }})</h2>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-slate-800 text-left text-xs uppercase tracking-[0.16em] text-slate-300">
+        <tr>
+          <th class="px-5 py-3">IP</th>
+          <th class="px-5 py-3">Hits</th>
+          <th class="px-5 py-3">Country</th>
+          <th class="px-5 py-3">Region / City</th>
+          <th class="px-5 py-3">First Seen</th>
+          <th class="px-5 py-3">Last Seen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="border-t border-slate-700/60 text-slate-200">
+          <td class="break-all px-5 py-3 font-mono text-xs">{{ row.client_ip }}</td>
+          <td class="px-5 py-3 font-semibold text-sky-300">{{ row.hits }}</td>
+          <td class="px-5 py-3">{{ row.geo.country or "-" }}</td>
+          <td class="px-5 py-3">{{ row.geo.region or "-" }}{% if row.geo.city %} / {{ row.geo.city }}{% endif %}</td>
+          <td class="px-5 py-3 font-mono text-xs">{{ row.first_seen }}</td>
+          <td class="px-5 py-3 font-mono text-xs">{{ row.last_seen }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="flex items-center justify-between gap-3 border-t border-slate-700/70 px-5 py-3 text-sm text-slate-200">
+    <div>
+      {% if page > 1 %}
+      <a href="/ips?page={{ prev_page }}&page_size={{ page_size }}&ip={{ ip_filter }}" class="inline-flex rounded-lg border border-slate-600 px-3 py-1.5 font-semibold text-slate-100 transition hover:border-sky-400">Previous</a>
+      {% endif %}
+    </div>
+    <span class="font-medium">Page {{ page }} / {{ pages }}</span>
+    <div class="text-right">
+      {% if page < pages %}
+      <a href="/ips?page={{ next_page }}&page_size={{ page_size }}&ip={{ ip_filter }}" class="inline-flex rounded-lg border border-slate-600 px-3 py-1.5 font-semibold text-slate-100 transition hover:border-sky-400">Next</a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="mt-5 rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="text-xl font-semibold text-white">Worldmap of top IP locations</h2>
+    <span class="rounded-full border border-slate-600 px-2.5 py-1 text-xs uppercase tracking-[0.14em] text-slate-300">Top {{ map_source_count }} by hits</span>
+  </div>
+  <div id="ipWorldMap" class="mt-4 h-[460px] w-full rounded-xl border border-slate-700"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
+<script>
+  const mapPoints = {{ map_points | tojson }};
+  const map = L.map('ipWorldMap', { worldCopyJump: true }).setView([20, 0], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 6,
+  }).addTo(map);
+
+  const bounds = [];
+  mapPoints.forEach((point) => {
+    const marker = L.circleMarker([point.lat, point.lon], {
+      radius: Math.max(4, Math.min(16, Math.round(Math.sqrt(point.hits)))),
+      color: '#38bdf8',
+      fillColor: '#0ea5e9',
+      fillOpacity: 0.55,
+      weight: 1.2,
+    }).addTo(map);
+    marker.bindPopup(
+      `<strong>${point.client_ip}</strong><br/>Hits: ${point.hits}<br/>${point.country || '-'}${point.city ? ` / ${point.city}` : ''}`,
+    );
+    bounds.push([point.lat, point.lon]);
+  });
+
+  if (bounds.length > 1) {
+    map.fitBounds(bounds, { padding: [20, 20] });
+  } else if (bounds.length === 1) {
+    map.setView(bounds[0], 4);
+  }
+</script>
+{% endblock %}

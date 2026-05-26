@@ -8,6 +8,7 @@ Docker Compose setup for a scanner-attracting HTTP service exposed on a VPS IP a
 - Logs every inbound HTTP request path into SQLite.
 - Rolls up and prunes raw scan records older than 7 days while keeping daily/method totals for dashboards.
 - Exposes a GUI with login-protected browsing.
+- Includes an `IPs` GUI page with top hitter ranking, geo enrichment, and a world map.
 - Supports GUI-managed webhooks with interval triggers, optional scan field filters, and templated JSON payload delivery.
 
 ## Images

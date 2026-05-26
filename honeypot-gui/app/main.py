@@ -1,9 +1,12 @@
+import asyncio
 import os
 import re
+import ipaddress
 from contextlib import asynccontextmanager
 from functools import wraps
 
 import bcrypt
+import httpx
 from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -52,10 +55,12 @@ DEFAULT_HEATMAP_THRESHOLDS = {
     "MEDIUM_MAX": 50,
     "HIGH_MAX": 200,
 }
+GEOLOOKUP_CACHE_LIMIT = 5000
 
 _db = Database(HONEYPOT_DB_PATH)
 _webhook_store = WebhookStore(GUI_DB_PATH)
 _webhook_dispatcher = WebhookDispatcher(honeypot_db_path=HONEYPOT_DB_PATH, store=_webhook_store)
+_geo_cache: dict[str, dict] = {}
 
 
 @asynccontextmanager
@@ -259,6 +264,66 @@ def _load_heatmap_thresholds() -> dict[str, int]:
     return _normalize_heatmap_thresholds(saved_thresholds, defaults=DEFAULT_HEATMAP_THRESHOLDS)
 
 
+def _is_public_ip(value: str) -> bool:
+    try:
+        return ipaddress.ip_address(value).is_global
+    except ValueError:
+        return False
+
+
+def _unknown_geo() -> dict:
+    return {
+        "country": "",
+        "region": "",
+        "city": "",
+        "continent": "",
+        "latitude": None,
+        "longitude": None,
+    }
+
+
+async def _fetch_geo_info(client: httpx.AsyncClient, ip: str) -> dict:
+    if ip in _geo_cache:
+        return _geo_cache[ip]
+
+    if not _is_public_ip(ip):
+        geo = _unknown_geo()
+        _geo_cache[ip] = geo
+        return geo
+
+    geo = _unknown_geo()
+    try:
+        response = await client.get(f"https://ipwho.is/{ip}")
+        response.raise_for_status()
+        payload = response.json()
+        if payload.get("success", True):
+            geo = {
+                "country": str(payload.get("country", "") or ""),
+                "region": str(payload.get("region", "") or ""),
+                "city": str(payload.get("city", "") or ""),
+                "continent": str(payload.get("continent", "") or ""),
+                "latitude": payload.get("latitude"),
+                "longitude": payload.get("longitude"),
+            }
+    except Exception:
+        pass
+
+    if len(_geo_cache) >= GEOLOOKUP_CACHE_LIMIT:
+        _geo_cache.pop(next(iter(_geo_cache)))
+    _geo_cache[ip] = geo
+    return geo
+
+
+async def _enrich_ips(ips: list[str]) -> dict[str, dict]:
+    unique_ips = sorted({ip for ip in ips if ip})
+    if not unique_ips:
+        return {}
+
+    async with httpx.AsyncClient(timeout=4.0) as client:
+        geos = await asyncio.gather(*[_fetch_geo_info(client, ip) for ip in unique_ips])
+    return {ip: geo for ip, geo in zip(unique_ips, geos, strict=False)}
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
@@ -424,6 +489,71 @@ async def scan_detail(request: Request, scan_id: int):
         request=request,
         name="scan_detail.html",
         context={"scan": scan},
+    )
+
+
+@app.get("/ips")
+@login_required
+async def ips_page(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=10, le=200),
+    ip: str = Query(default=""),
+):
+    rows, total = _db.list_ip_overview(
+        page=page,
+        page_size=page_size,
+        ip_filter=ip.strip(),
+    )
+    pages = max((total + page_size - 1) // page_size, 1)
+
+    table_ips = [row.client_ip for row in rows]
+    map_source = _db.top_ip_hitters(limit=200)
+    map_ips = [row["client_ip"] for row in map_source]
+    geo_by_ip = await _enrich_ips([*table_ips, *map_ips])
+
+    enriched_rows = [
+        {
+            "client_ip": row.client_ip,
+            "hits": row.hits,
+            "first_seen": row.first_seen,
+            "last_seen": row.last_seen,
+            "geo": geo_by_ip.get(row.client_ip, _unknown_geo()),
+        }
+        for row in rows
+    ]
+
+    map_points = []
+    for row in map_source:
+        geo = geo_by_ip.get(row["client_ip"], _unknown_geo())
+        lat = geo.get("latitude")
+        lon = geo.get("longitude")
+        if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+            map_points.append(
+                {
+                    "client_ip": row["client_ip"],
+                    "hits": row["hits"],
+                    "country": geo.get("country", ""),
+                    "city": geo.get("city", ""),
+                    "lat": lat,
+                    "lon": lon,
+                }
+            )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="ips.html",
+        context={
+            "rows": enriched_rows,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": pages,
+            "ip_filter": ip,
+            "top_hitters": map_source[:10],
+            "map_points": map_points,
+            "map_source_count": len(map_source),
+        },
     )
 
 
