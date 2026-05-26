@@ -100,6 +100,14 @@ class WebhookStore:
                 """
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_webhooks_enabled ON webhooks(enabled)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS gui_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+                """
+            )
             columns = conn.execute("PRAGMA table_info(webhooks)").fetchall()
             has_filter_method = any(str(row["name"]) == "filter_method" for row in columns)
             has_body_size_gt_zero = any(str(row["name"]) == "body_size_gt_zero" for row in columns)
@@ -292,6 +300,31 @@ class WebhookStore:
             deleted = conn.execute("DELETE FROM webhooks WHERE id = ?", (webhook_id,)).rowcount
             conn.commit()
             return bool(deleted)
+
+    def get_json_setting(self, key: str) -> dict[str, str]:
+        with self._lock, self._connect() as conn:
+            row = conn.execute("SELECT value FROM gui_settings WHERE key = ?", (key,)).fetchone()
+        if row is None:
+            return {}
+        try:
+            data = json.loads(str(row["value"]))
+        except json.JSONDecodeError:
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        return {str(name): str(value) for name, value in data.items()}
+
+    def set_json_setting(self, key: str, value: dict[str, str]) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO gui_settings(key, value)
+                VALUES(?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (key, json.dumps(value, ensure_ascii=True)),
+            )
+            conn.commit()
 
     def mark_result(
         self,

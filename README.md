@@ -90,7 +90,8 @@ In compose environment for `honeypot-gui`:
 
 ## Webhooks
 
-- Configure webhooks in the GUI under the `Webhooks` page.
+- Configure webhooks in the GUI under the `Settings` page.
+- Customize dashboard HTTP method pie-chart colors under `Settings` to fit your traffic profile.
 - Trigger behavior: every `X` seconds per webhook.
 - Optional filtering: match a scan field exactly (for example `method = POST` or `path = /admin`).
 - Payload is rendered from a JSON template with these variables:

@@ -1,4 +1,5 @@
 import os
+import re
 from contextlib import asynccontextmanager
 from functools import wraps
 
@@ -27,6 +28,16 @@ GUI_SESSION_SECRET = os.getenv("GUI_SESSION_SECRET", "")
 WEBHOOK_FILTER_FIELDS = ["", *ALLOWED_FILTER_FIELDS.keys()]
 WEBHOOK_METHODS = ["", "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
 WEBHOOK_OPERATORS = ["equals", "contains"]
+METHOD_COLOR_SETTING_KEY = "dashboard_method_colors"
+DEFAULT_METHOD_COLORS = {
+    "GET": "#2563eb",
+    "POST": "#059669",
+    "PUT": "#0ea5e9",
+    "PATCH": "#14b8a6",
+    "DELETE": "#b23a48",
+    "HEAD": "#7c3aed",
+    "OPTIONS": "#ea580c",
+}
 
 _db = Database(HONEYPOT_DB_PATH)
 _webhook_store = WebhookStore(GUI_DB_PATH)
@@ -173,6 +184,21 @@ def _validate_webhook_payload_template(payload_template: str) -> str:
     return candidate
 
 
+def _normalize_hex_color(candidate: str, default: str) -> str:
+    normalized = candidate.strip()
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", normalized):
+        return normalized.lower()
+    return default
+
+
+def _load_method_colors() -> dict[str, str]:
+    saved_colors = _webhook_store.get_json_setting(METHOD_COLOR_SETTING_KEY)
+    return {
+        method: _normalize_hex_color(saved_colors.get(method, ""), default)
+        for method, default in DEFAULT_METHOD_COLORS.items()
+    }
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
@@ -217,7 +243,44 @@ def logout(request: Request):
 @app.get("/")
 @login_required
 async def dashboard(request: Request):
-    return templates.TemplateResponse(request=request, name="dashboard.html", context={})
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={"method_colors": _load_method_colors()},
+    )
+
+
+@app.get("/settings")
+@login_required
+async def settings_page(request: Request, msg: str = Query(default="")):
+    webhooks = _webhook_store.list_webhooks()
+    preview_by_webhook = {
+        webhook.id: _db.list_matching_scans(
+            method_filter=webhook.filter_method,
+            body_size_gt_zero=webhook.body_size_gt_zero,
+            burst_packets=webhook.burst_packets,
+            burst_window_seconds=webhook.burst_window_seconds,
+            field_filter=webhook.filter_field,
+            operator_filter=webhook.filter_operator,
+            value_filter=webhook.filter_value,
+            limit=8,
+        )
+        for webhook in webhooks
+    }
+
+    return templates.TemplateResponse(
+        request=request,
+        name="webhooks.html",
+        context={
+            "webhooks": webhooks,
+            "preview_by_webhook": preview_by_webhook,
+            "message": msg,
+            "method_colors": _load_method_colors(),
+            "filter_fields": WEBHOOK_FILTER_FIELDS,
+            "filter_methods": WEBHOOK_METHODS,
+            "filter_operators": WEBHOOK_OPERATORS,
+        },
+    )
 
 
 @app.get("/scans")
@@ -307,34 +370,39 @@ async def stats_api(request: Request):
 
 @app.get("/webhooks")
 @login_required
-async def webhooks_page(request: Request, msg: str = Query(default="")):
-    webhooks = _webhook_store.list_webhooks()
-    preview_by_webhook = {
-        webhook.id: _db.list_matching_scans(
-            method_filter=webhook.filter_method,
-            body_size_gt_zero=webhook.body_size_gt_zero,
-            burst_packets=webhook.burst_packets,
-            burst_window_seconds=webhook.burst_window_seconds,
-            field_filter=webhook.filter_field,
-            operator_filter=webhook.filter_operator,
-            value_filter=webhook.filter_value,
-            limit=8,
-        )
-        for webhook in webhooks
-    }
+async def webhooks_page(request: Request):
+    _ = request
+    return RedirectResponse(url="/settings", status_code=303)
 
-    return templates.TemplateResponse(
-        request=request,
-        name="webhooks.html",
-        context={
-            "webhooks": webhooks,
-            "preview_by_webhook": preview_by_webhook,
-            "message": msg,
-            "filter_fields": WEBHOOK_FILTER_FIELDS,
-            "filter_methods": WEBHOOK_METHODS,
-            "filter_operators": WEBHOOK_OPERATORS,
-        },
-    )
+
+@app.post("/settings/method-colors")
+@login_required
+async def settings_method_colors(
+    request: Request,
+    get_color: str = Form(default=""),
+    post_color: str = Form(default=""),
+    put_color: str = Form(default=""),
+    patch_color: str = Form(default=""),
+    delete_color: str = Form(default=""),
+    head_color: str = Form(default=""),
+    options_color: str = Form(default=""),
+):
+    _ = request
+    submitted = {
+        "GET": get_color,
+        "POST": post_color,
+        "PUT": put_color,
+        "PATCH": patch_color,
+        "DELETE": delete_color,
+        "HEAD": head_color,
+        "OPTIONS": options_color,
+    }
+    colors = {
+        method: _normalize_hex_color(submitted.get(method, ""), default)
+        for method, default in DEFAULT_METHOD_COLORS.items()
+    }
+    _webhook_store.set_json_setting(METHOD_COLOR_SETTING_KEY, colors)
+    return RedirectResponse(url="/settings?msg=Settings+updated", status_code=303)
 
 
 @app.post("/webhooks")
@@ -383,7 +451,7 @@ async def webhooks_create(
         payload_template=payload_clean,
     )
 
-    return RedirectResponse(url="/webhooks?msg=Webhook+created", status_code=303)
+    return RedirectResponse(url="/settings?msg=Webhook+created", status_code=303)
 
 
 @app.post("/webhooks/test")
@@ -551,7 +619,7 @@ async def webhook_edit_submit(
     if not updated:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
-    return RedirectResponse(url="/webhooks?msg=Webhook+updated", status_code=303)
+    return RedirectResponse(url="/settings?msg=Webhook+updated", status_code=303)
 
 
 @app.post("/webhooks/{webhook_id}/delete")
@@ -561,4 +629,4 @@ async def webhook_delete(request: Request, webhook_id: int):
     deleted = _webhook_store.delete_webhook(webhook_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Webhook not found")
-    return RedirectResponse(url="/webhooks?msg=Webhook+deleted", status_code=303)
+    return RedirectResponse(url="/settings?msg=Webhook+deleted", status_code=303)

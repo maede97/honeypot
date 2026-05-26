@@ -67,15 +67,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <script>
-  const METHOD_COLORS = {
-    GET: '#2563eb',
-    POST: '#059669',
-    PUT: '#0ea5e9',
-    PATCH: '#14b8a6',
-    DELETE: '#b23a48',
-    HEAD: '#7c3aed',
-    OPTIONS: '#ea580c',
-  };
+  const METHOD_COLORS = {{ method_colors | tojson }};
 
   function createBar(day, count, max) {
     const width = max > 0 ? Math.max((count / max) * 100, 2) : 2;
