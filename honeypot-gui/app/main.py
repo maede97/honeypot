@@ -29,6 +29,7 @@ WEBHOOK_FILTER_FIELDS = ["", *ALLOWED_FILTER_FIELDS.keys()]
 WEBHOOK_METHODS = ["", "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
 WEBHOOK_OPERATORS = ["equals", "contains"]
 METHOD_COLOR_SETTING_KEY = "dashboard_method_colors"
+HEATMAP_COLOR_SETTING_KEY = "dashboard_heatmap_colors"
 DEFAULT_METHOD_COLORS = {
     "GET": "#2563eb",
     "POST": "#059669",
@@ -37,6 +38,13 @@ DEFAULT_METHOD_COLORS = {
     "DELETE": "#b23a48",
     "HEAD": "#7c3aed",
     "OPTIONS": "#ea580c",
+}
+DEFAULT_HEATMAP_COLORS = {
+    "ZERO": "#1e334c",
+    "LOW": "#3394ff",
+    "MEDIUM": "#2fcf88",
+    "HIGH": "#14b86b",
+    "VERY_HIGH": "#f59f0b",
 }
 
 _db = Database(HONEYPOT_DB_PATH)
@@ -199,6 +207,14 @@ def _load_method_colors() -> dict[str, str]:
     }
 
 
+def _load_heatmap_colors() -> dict[str, str]:
+    saved_colors = _webhook_store.get_json_setting(HEATMAP_COLOR_SETTING_KEY)
+    return {
+        bucket: _normalize_hex_color(saved_colors.get(bucket, ""), default)
+        for bucket, default in DEFAULT_HEATMAP_COLORS.items()
+    }
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
@@ -246,7 +262,10 @@ async def dashboard(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
-        context={"method_colors": _load_method_colors()},
+        context={
+            "method_colors": _load_method_colors(),
+            "heatmap_colors": _load_heatmap_colors(),
+        },
     )
 
 
@@ -276,6 +295,7 @@ async def settings_page(request: Request, msg: str = Query(default="")):
             "preview_by_webhook": preview_by_webhook,
             "message": msg,
             "method_colors": _load_method_colors(),
+            "heatmap_colors": _load_heatmap_colors(),
             "filter_fields": WEBHOOK_FILTER_FIELDS,
             "filter_methods": WEBHOOK_METHODS,
             "filter_operators": WEBHOOK_OPERATORS,
@@ -402,6 +422,32 @@ async def settings_method_colors(
         for method, default in DEFAULT_METHOD_COLORS.items()
     }
     _webhook_store.set_json_setting(METHOD_COLOR_SETTING_KEY, colors)
+    return RedirectResponse(url="/settings?msg=Settings+updated", status_code=303)
+
+
+@app.post("/settings/heatmap-colors")
+@login_required
+async def settings_heatmap_colors(
+    request: Request,
+    zero_color: str = Form(default=""),
+    low_color: str = Form(default=""),
+    medium_color: str = Form(default=""),
+    high_color: str = Form(default=""),
+    very_high_color: str = Form(default=""),
+):
+    _ = request
+    submitted = {
+        "ZERO": zero_color,
+        "LOW": low_color,
+        "MEDIUM": medium_color,
+        "HIGH": high_color,
+        "VERY_HIGH": very_high_color,
+    }
+    colors = {
+        bucket: _normalize_hex_color(submitted.get(bucket, ""), default)
+        for bucket, default in DEFAULT_HEATMAP_COLORS.items()
+    }
+    _webhook_store.set_json_setting(HEATMAP_COLOR_SETTING_KEY, colors)
     return RedirectResponse(url="/settings?msg=Settings+updated", status_code=303)
 
 

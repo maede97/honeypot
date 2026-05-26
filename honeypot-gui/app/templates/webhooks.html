@@ -57,6 +57,41 @@
       </form>
     </article>
 
+    <article class="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4">
+      <h2 class="text-lg font-semibold text-white">Dashboard Heatmap Colors</h2>
+      <p class="mt-2 text-sm text-slate-300">Customize the traffic heatmap colors shown on the dashboard.</p>
+      <form method="post" action="/settings/heatmap-colors" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          0
+          <input type="color" name="zero_color" value="{{ heatmap_colors.ZERO }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          1-10
+          <input type="color" name="low_color" value="{{ heatmap_colors.LOW }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          11-50
+          <input type="color" name="medium_color" value="{{ heatmap_colors.MEDIUM }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          51-200
+          <input type="color" name="high_color" value="{{ heatmap_colors.HIGH }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
+          200+
+          <input type="color" name="very_high_color" value="{{ heatmap_colors.VERY_HIGH }}" class="h-10 w-full rounded-lg border border-slate-700 bg-slate-800 p-1" />
+        </label>
+        <div class="sm:col-span-2 lg:col-span-5">
+          <button
+            type="submit"
+            class="rounded-xl border border-sky-400/70 bg-sky-400/20 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-400/30"
+          >
+            Save Colors
+          </button>
+        </div>
+      </form>
+    </article>
+
     <h2 class="text-xl font-semibold text-white">Webhooks</h2>
   </div>
 
