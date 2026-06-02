@@ -429,7 +429,7 @@ async def scans(
     sort_dir: str = Query(default="desc"),
 ):
     method = method.upper().strip()
-    if method and method not in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}:
+    if method and method not in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "PROPFIND", "CONNECT"}:
         raise HTTPException(status_code=400, detail="Unsupported HTTP method filter")
 
     sort_by = sort_by.strip().lower()
