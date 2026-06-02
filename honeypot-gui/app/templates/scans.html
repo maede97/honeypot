@@ -32,7 +32,7 @@
         class="w-full min-w-0 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
       >
         <option value="" {% if not filters.method %}selected{% endif %}>Any</option>
-        {% for m in ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] %}
+        {% for m in ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "PROPFIND", "CONNECT"] %}
         <option value="{{ m }}" {% if filters.method == m %}selected{% endif %}>{{ m }}</option>
         {% endfor %}
       </select>
