@@ -4,9 +4,10 @@
 {% block content %}
 <section class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
   <h2 class="text-xl font-semibold text-white">Filters</h2>
-  <form method="get" action="/scans" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+  <form method="get" action="/scans" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" data-scan-filter-form>
     <input type="hidden" name="sort_by" value="{{ sort.by }}" />
     <input type="hidden" name="sort_dir" value="{{ sort.dir }}" />
+    <input type="hidden" name="range" value="{{ active_range }}" data-range-field />
     <label class="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300"
       >Path
       <input
@@ -38,22 +39,20 @@
       </select>
     </label>
     <label class="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300"
-      >From (ISO)
+      >From
       <input
-        type="text"
+        type="datetime-local"
         name="from_ts"
-        value="{{ filters.from_ts }}"
-        placeholder="2026-05-01T00:00:00"
+        value="{{ filters.from_ts_local }}"
         class="w-full min-w-0 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
       />
     </label>
     <label class="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300"
-      >To (ISO)
+      >To
       <input
-        type="text"
+        type="datetime-local"
         name="to_ts"
-        value="{{ filters.to_ts }}"
-        placeholder="2026-05-31T23:59:59"
+        value="{{ filters.to_ts_local }}"
         class="w-full min-w-0 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
       />
     </label>
@@ -69,14 +68,34 @@
       />
     </label>
     <div class="md:col-span-2 xl:col-span-3 2xl:col-span-6">
+      <div class="mb-3 flex flex-wrap items-center gap-2">
+        <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Quick ranges</span>
+        <button type="button" data-range-preset="1h" class="rounded-lg border px-2.5 py-1 text-xs font-semibold transition {{ 'border-sky-400/80 bg-sky-500/20 text-sky-200' if active_range == '1h' else 'border-slate-600 text-slate-200 hover:border-slate-400' }}">Last 1h</button>
+        <button type="button" data-range-preset="24h" class="rounded-lg border px-2.5 py-1 text-xs font-semibold transition {{ 'border-sky-400/80 bg-sky-500/20 text-sky-200' if active_range == '24h' else 'border-slate-600 text-slate-200 hover:border-slate-400' }}">Last 24h</button>
+        <button type="button" data-range-preset="7d" class="rounded-lg border px-2.5 py-1 text-xs font-semibold transition {{ 'border-sky-400/80 bg-sky-500/20 text-sky-200' if active_range == '7d' else 'border-slate-600 text-slate-200 hover:border-slate-400' }}">Last 7d</button>
+      </div>
+      <div class="flex flex-wrap gap-2">
       <button
         type="submit"
         class="rounded-xl border border-sky-400/70 bg-sky-400/20 px-4 py-2 text-sm font-semibold text-sky-400 transition hover:bg-sky-400/30"
       >
         Apply
       </button>
+      <a href="/scans?page=1&page_size={{ page_size }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}" class="rounded-xl border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-400">Reset filters</a>
+      </div>
     </div>
   </form>
+  {% set has_active_filters = filters.path or filters.ip or filters.method or filters.from_ts or filters.to_ts %}
+  {% if has_active_filters %}
+  <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-200">
+    <span class="font-semibold uppercase tracking-[0.14em] text-slate-300">Active</span>
+    {% if filters.path %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">path={{ filters.path }}</span>{% endif %}
+    {% if filters.ip %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">ip={{ filters.ip }}</span>{% endif %}
+    {% if filters.method %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">method={{ filters.method }}</span>{% endif %}
+    {% if filters.from_ts %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">from={{ filters.from_ts }}</span>{% endif %}
+    {% if filters.to_ts %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">to={{ filters.to_ts }}</span>{% endif %}
+  </div>
+  {% endif %}
 </section>
 
 <section class="mt-5 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 shadow-2xl shadow-black/30">
@@ -96,7 +115,7 @@
     <div>
       {% if page > 1 %}
       <a
-        href="/scans?page={{ prev_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}"
+        href="/scans?page={{ prev_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
         class="inline-flex rounded-lg border border-slate-600 px-3 py-1.5 font-semibold text-slate-100 transition hover:border-sky-400"
         >Previous</a
       >
@@ -106,7 +125,7 @@
     <div class="text-right">
       {% if page < pages %}
       <a
-        href="/scans?page={{ next_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}"
+        href="/scans?page={{ next_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
         class="inline-flex rounded-lg border border-slate-600 px-3 py-1.5 font-semibold text-slate-100 transition hover:border-sky-400"
         >Next</a
       >
@@ -116,10 +135,10 @@
 
   <div class="overflow-x-auto pb-1">
     <table class="w-full table-auto text-sm">
-      <thead class="bg-slate-800 text-left text-xs uppercase tracking-[0.16em] text-slate-300">
+      <thead class="sticky top-0 z-10 bg-slate-800 text-left text-xs uppercase tracking-[0.16em] text-slate-300">
         <tr>
           <th class="w-[88px] px-3 py-3 whitespace-nowrap">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ts&sort_dir={{ time_sort_dir }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ts&sort_dir={{ time_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Time</span>
               {% if sort.by == 'ts' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -129,7 +148,7 @@
             </a>
           </th>
           <th class="w-[74px] px-2 py-3 whitespace-nowrap">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=method&sort_dir={{ method_sort_dir }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=method&sort_dir={{ method_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Method</span>
               {% if sort.by == 'method' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -139,7 +158,7 @@
             </a>
           </th>
           <th class="min-w-[220px] px-3 py-3">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=path&sort_dir={{ path_sort_dir }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=path&sort_dir={{ path_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Path</span>
               {% if sort.by == 'path' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -149,7 +168,7 @@
             </a>
           </th>
           <th class="px-4 py-3 whitespace-nowrap">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ip&sort_dir={{ ip_sort_dir }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ip&sort_dir={{ ip_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>IP</span>
               {% if sort.by == 'ip' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -159,7 +178,7 @@
             </a>
           </th>
           <th class="px-4 py-3">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ua&sort_dir={{ ua_sort_dir }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ua&sort_dir={{ ua_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>User Agent</span>
               {% if sort.by == 'ua' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -169,7 +188,7 @@
             </a>
           </th>
           <th class="w-[74px] px-2 py-3 whitespace-nowrap">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=body&sort_dir={{ body_sort_dir }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=body&sort_dir={{ body_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Body</span>
               {% if sort.by == 'body' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -196,7 +215,7 @@
       {% else %}
       {% set method_classes = "bg-slate-700/30 text-slate-200 border-slate-500/60" %}
       {% endif %}
-      <tr class="border-t border-slate-700/60 align-top text-slate-200">
+      <tr class="border-t border-slate-700/60 align-top text-slate-200 {{ 'bg-slate-900/10' if loop.index0 % 2 == 0 else 'bg-slate-900/40' }}">
         <td class="px-3 py-3 font-mono text-[11px] leading-4 text-slate-300">
           {% if row.ts and row.ts|length >= 19 %}
           <span class="block">{{ row.ts[0:10] }}</span>
@@ -255,7 +274,7 @@
     <div>
       {% if page > 1 %}
       <a
-        href="/scans?page={{ prev_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}"
+        href="/scans?page={{ prev_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
         class="inline-flex rounded-lg border border-slate-600 px-3 py-1.5 font-semibold text-slate-100 transition hover:border-sky-400"
         >Previous</a
       >
@@ -265,7 +284,7 @@
     <div class="text-right">
       {% if page < pages %}
       <a
-        href="/scans?page={{ next_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}"
+        href="/scans?page={{ next_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
         class="inline-flex rounded-lg border border-slate-600 px-3 py-1.5 font-semibold text-slate-100 transition hover:border-sky-400"
         >Next</a
       >
@@ -273,4 +292,21 @@
     </div>
   </div>
 </section>
+<script>
+  (function () {
+    const form = document.querySelector('[data-scan-filter-form]');
+    if (!form) {
+      return;
+    }
+    const rangeField = form.querySelector('[data-range-field]');
+    form.querySelectorAll('[data-range-preset]').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (rangeField) {
+          rangeField.value = button.dataset.rangePreset || '';
+        }
+        form.requestSubmit();
+      });
+    });
+  })();
+</script>
 {% endblock %}

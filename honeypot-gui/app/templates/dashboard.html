@@ -16,6 +16,18 @@
   </article>
 </section>
 
+<section class="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/70 px-4 py-3 text-sm">
+  <span data-dashboard-status class="font-medium text-slate-300">Loading latest stats…</span>
+  <span data-dashboard-updated class="font-mono text-xs text-slate-400"></span>
+  <button
+    type="button"
+    data-dashboard-retry
+    class="hidden rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-200 transition hover:border-slate-300"
+  >
+    Retry
+  </button>
+</section>
+
 <section class="mt-5 grid grid-cols-1 gap-4 min-[560px]:grid-cols-[0.95fr_1.65fr]">
   <article class="rounded-2xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl shadow-black/30">
     <h2 class="text-xl font-semibold text-white">HTTP Method Split</h2>
@@ -243,32 +255,81 @@
     heatmapChart.updateSeries(series);
   }
 
-  async function loadStats() {
-    const response = await fetch('/api/stats');
-    if (!response.ok) {
+  const dashboardStatus = document.querySelector('[data-dashboard-status]');
+  const dashboardUpdated = document.querySelector('[data-dashboard-updated]');
+  const dashboardRetry = document.querySelector('[data-dashboard-retry]');
+
+  function setStatus(kind, text) {
+    if (!dashboardStatus) {
       return;
     }
+    dashboardStatus.textContent = text;
+    dashboardStatus.classList.remove('text-slate-300', 'text-emerald-300', 'text-rose-300', 'text-amber-300');
+    if (kind === 'ok') {
+      dashboardStatus.classList.add('text-emerald-300');
+    } else if (kind === 'error') {
+      dashboardStatus.classList.add('text-rose-300');
+    } else if (kind === 'loading') {
+      dashboardStatus.classList.add('text-amber-300');
+    } else {
+      dashboardStatus.classList.add('text-slate-300');
+    }
+  }
 
-    const data = await response.json();
-    document.getElementById('kpiTotal').textContent = data.total;
-    document.getElementById('kpiLast24').textContent = data.last_24h;
-    document.getElementById('kpiUnique').textContent = data.unique_paths;
-    renderMethodPie(data.method_counts || []);
-    renderHeatmap(data.daily || []);
+  function setUpdatedNow() {
+    if (!dashboardUpdated) {
+      return;
+    }
+    dashboardUpdated.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+  }
 
-    const body = document.querySelector('#topPathTable tbody');
-    body.innerHTML = data.top_paths
-      .map((item) => `<tr class="border-t border-slate-700/60"><td class="max-w-0 truncate px-5 py-3 font-mono text-slate-100">${item.path}</td><td class="px-5 py-3 font-semibold text-slate-200">${item.count}</td></tr>`)
-      .join('');
+  function setRetryVisible(visible) {
+    if (!dashboardRetry) {
+      return;
+    }
+    dashboardRetry.classList.toggle('hidden', !visible);
+  }
 
-    const recent = (data.daily || []).slice(-14);
-    const max = Math.max(...recent.map((d) => d.count), 0);
-    document.getElementById('dailyBars').innerHTML = recent
-      .map((d) => createBar(d.day, d.count, max))
-      .join('');
+  async function loadStats() {
+    setStatus('loading', 'Loading latest stats…');
+    setRetryVisible(false);
+    try {
+      const response = await fetch('/api/stats');
+      if (!response.ok) {
+        throw new Error(`Stats request failed with ${response.status}`);
+      }
+
+      const data = await response.json();
+      document.getElementById('kpiTotal').textContent = data.total;
+      document.getElementById('kpiLast24').textContent = data.last_24h;
+      document.getElementById('kpiUnique').textContent = data.unique_paths;
+      renderMethodPie(data.method_counts || []);
+      renderHeatmap(data.daily || []);
+
+      const body = document.querySelector('#topPathTable tbody');
+      body.innerHTML = data.top_paths
+        .map((item) => `<tr class="border-t border-slate-700/60"><td class="max-w-0 truncate px-5 py-3 font-mono text-slate-100">${item.path}</td><td class="px-5 py-3 font-semibold text-slate-200">${item.count}</td></tr>`)
+        .join('');
+
+      const recent = (data.daily || []).slice(-14);
+      const max = Math.max(...recent.map((d) => d.count), 0);
+      document.getElementById('dailyBars').innerHTML = recent
+        .map((d) => createBar(d.day, d.count, max))
+        .join('');
+      setStatus('ok', 'Stats loaded successfully.');
+      setUpdatedNow();
+    } catch (_error) {
+      setStatus('error', 'Failed to load dashboard stats.');
+      setRetryVisible(true);
+    }
   }
 
   window.refreshDashboardData = loadStats;
+  if (dashboardRetry) {
+    dashboardRetry.addEventListener('click', () => {
+      loadStats();
+    });
+  }
   loadStats();
 </script>
 {% endblock %}

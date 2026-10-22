@@ -21,6 +21,10 @@
   <body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
     {% set current_path = request.url.path %}
     {% set has_auto_refresh = current_path == '/' or current_path == '/scans' %}
+    {% set nav_dashboard_active = current_path == '/' %}
+    {% set nav_scans_active = current_path == '/scans' or current_path.startswith('/scans/') %}
+    {% set nav_ips_active = current_path == '/ips' %}
+    {% set nav_settings_active = current_path == '/settings' or current_path.startswith('/webhooks') %}
     <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
       <div class="absolute -left-32 top-0 h-96 w-96 rounded-full bg-sky-500/20 blur-3xl"></div>
       <div class="absolute right-0 top-1/3 h-[26rem] w-[26rem] rounded-full bg-emerald-500/15 blur-3xl"></div>
@@ -34,25 +38,25 @@
         <nav class="flex items-center gap-2 text-sm text-slate-200 sm:gap-3">
           <a
             href="/"
-            class="rounded-md border border-slate-700/80 bg-slate-800/70 px-3 py-1.5 transition hover:border-slate-300 hover:text-white"
+            class="rounded-md border px-3 py-1.5 transition {{ 'border-sky-400/80 bg-sky-500/20 text-sky-200' if nav_dashboard_active else 'border-slate-700/80 bg-slate-800/70 hover:border-slate-300 hover:text-white' }}"
           >
             Dashboard
           </a>
           <a
             href="/scans"
-            class="rounded-md border border-slate-700/80 bg-slate-800/70 px-3 py-1.5 transition hover:border-slate-300 hover:text-white"
+            class="rounded-md border px-3 py-1.5 transition {{ 'border-sky-400/80 bg-sky-500/20 text-sky-200' if nav_scans_active else 'border-slate-700/80 bg-slate-800/70 hover:border-slate-300 hover:text-white' }}"
           >
             Scans
           </a>
           <a
             href="/ips"
-            class="rounded-md border border-slate-700/80 bg-slate-800/70 px-3 py-1.5 transition hover:border-slate-300 hover:text-white"
+            class="rounded-md border px-3 py-1.5 transition {{ 'border-sky-400/80 bg-sky-500/20 text-sky-200' if nav_ips_active else 'border-slate-700/80 bg-slate-800/70 hover:border-slate-300 hover:text-white' }}"
           >
             IPs
           </a>
           <a
             href="/settings"
-            class="rounded-md border border-slate-700/80 bg-slate-800/70 px-3 py-1.5 transition hover:border-slate-300 hover:text-white"
+            class="rounded-md border px-3 py-1.5 transition {{ 'border-sky-400/80 bg-sky-500/20 text-sky-200' if nav_settings_active else 'border-slate-700/80 bg-slate-800/70 hover:border-slate-300 hover:text-white' }}"
           >
             Settings
           </a>
@@ -85,6 +89,7 @@
           {% endif %}
 
           <form method="post" action="/logout">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
           <button
             type="submit"
             class="rounded-md border border-amber-400/60 bg-amber-400/20 px-3 py-1.5 text-sm font-semibold text-amber-300 transition hover:bg-amber-400/30"
@@ -96,7 +101,7 @@
       </div>
     </header>
 
-    <main class="{% block main_class %}mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8{% endblock %}">{% block content %}{% endblock %}</main>
+    <main class="{% block main_class %}w-full px-2 py-6 sm:px-4 sm:py-8 lg:px-6 xl:px-8{% endblock %}">{% block content %}{% endblock %}</main>
 
     <script>
       async function copyTextToClipboard(text) {
@@ -164,6 +169,92 @@
 
       window.copyTextToClipboard = copyTextToClipboard;
       window.bindCopyFields = bindCopyFields;
+      function setupAccessibleModal({
+        modal,
+        panel,
+        openButton,
+        closeButtons = [],
+        onOpen = () => {},
+        onClose = () => {},
+      }) {
+        if (!modal || !panel || !openButton) {
+          return { open: () => {}, close: () => {} };
+        }
+
+        const focusableSelector = [
+          'a[href]',
+          'button:not([disabled])',
+          'textarea:not([disabled])',
+          'input:not([disabled])',
+          'select:not([disabled])',
+          '[tabindex]:not([tabindex="-1"])',
+        ].join(',');
+
+        let lastFocused = null;
+
+        function trapFocus(event) {
+          if (event.key !== 'Tab') {
+            return;
+          }
+          const nodes = [...panel.querySelectorAll(focusableSelector)].filter((node) => node.offsetParent !== null);
+          if (!nodes.length) {
+            event.preventDefault();
+            return;
+          }
+          const first = nodes[0];
+          const last = nodes[nodes.length - 1];
+          if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+
+        function keyHandler(event) {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            close();
+            return;
+          }
+          trapFocus(event);
+        }
+
+        function backdropHandler(event) {
+          if (event.target === modal) {
+            close();
+          }
+        }
+
+        function open() {
+          lastFocused = document.activeElement;
+          onOpen();
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+          document.body.classList.add('overflow-hidden');
+          panel.focus();
+          document.addEventListener('keydown', keyHandler);
+        }
+
+        function close() {
+          onClose();
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+          document.body.classList.remove('overflow-hidden');
+          document.removeEventListener('keydown', keyHandler);
+          if (lastFocused instanceof HTMLElement) {
+            lastFocused.focus();
+          }
+        }
+
+        openButton.addEventListener('click', open);
+        closeButtons.forEach((button) => button.addEventListener('click', close));
+        modal.addEventListener('click', backdropHandler);
+
+        return { open, close };
+      }
+      window.setupAccessibleModal = setupAccessibleModal;
 
       function setupAutoRefreshControl() {
         const container = document.querySelector('[data-auto-refresh-control]');

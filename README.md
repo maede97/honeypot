@@ -8,6 +8,7 @@ Docker Compose setup for a scanner-attracting HTTP service exposed on a VPS IP a
 - Logs every inbound HTTP request path into SQLite.
 - Rolls up and prunes raw scan records older than 7 days while keeping daily/method totals for dashboards.
 - Exposes a GUI with login-protected browsing.
+- Adds CSRF protection to all GUI form submissions.
 - Includes an `IPs` GUI page with top hitter ranking, geo enrichment, and a world map.
 - Supports GUI-managed webhooks with interval triggers, optional scan field filters, and templated JSON payload delivery.
 
@@ -92,13 +93,20 @@ In compose environment for `honeypot-gui`:
 ## Webhooks
 
 - Configure webhooks in the GUI under the `Settings` page.
+- `Settings` now groups controls into `Appearance`, `Webhooks`, and `Advanced` tabs for faster navigation.
 - Customize dashboard HTTP method pie-chart colors and traffic heatmap colors/threshold ranges under `Settings` to fit your traffic profile.
+- Use `Validate Template` and `Preview Payload` before saving or testing webhook templates.
 - Trigger behavior: every `X` seconds per webhook.
 - Optional filtering: match a scan field exactly (for example `method = POST` or `path = /admin`).
 - Payload is rendered from a JSON template with these variables:
 	- `scan.id`, `scan.ts`, `scan.method`, `scan.path`, `scan.query_string`, `scan.url`, `scan.client_ip`, `scan.user_agent`, `scan.body_size`, `scan.body_text`
 	- `webhook.id`, `webhook.name`, `now`
 - Use `| tojson` for dynamic values in templates to keep output JSON valid.
+
+## Scans filtering
+
+- The `Scans` page supports quick time ranges (`Last 1h`, `Last 24h`, `Last 7d`) and native datetime pickers.
+- Use `Reset filters` to jump back to an unfiltered scan list.
 
 Generate the GUI bcrypt hash:
 

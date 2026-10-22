@@ -577,6 +577,36 @@ class WebhookDispatcher:
             "payload": payload,
         }
 
+    def validate_payload_template(self, *, name: str, payload_template: str) -> dict[str, Any]:
+        sample_scan: dict[str, Any] = {
+            "id": 0,
+            "ts": _utc_now_iso(),
+            "method": "GET",
+            "path": "/sample/path",
+            "query_string": "a=1",
+            "client_ip": "203.0.113.10",
+            "user_agent": "sample-agent",
+            "body_size": 0,
+            "body_text": "",
+            "headers": {"x-test": "sample"},
+            "url": "/sample/path?a=1",
+        }
+        try:
+            payload = self._render_payload_from_values(
+                payload_template=payload_template,
+                webhook_id=0,
+                webhook_name=name,
+                scan=sample_scan,
+                burst_count=0,
+            )
+        except Exception as exc:
+            return {
+                "ok": False,
+                "reason": "render_failed",
+                "message": str(exc)[:500],
+            }
+        return {"ok": True, "message": "Template is valid JSON.", "payload": payload}
+
     def _connect_honeypot(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._honeypot_db_uri, uri=True)
         conn.row_factory = sqlite3.Row

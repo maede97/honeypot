@@ -8,38 +8,20 @@
   </div>
 
   <form method="post" action="/webhooks/{{ webhook.id }}/edit" class="mt-5 grid gap-3" data-edit-webhook-form>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
     <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
       Name
-      <input
-        type="text"
-        name="name"
-        required
-        value="{{ webhook.name }}"
-        class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
-      />
+      <input type="text" name="name" required value="{{ webhook.name }}" class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400" />
     </label>
 
     <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
       Target URL
-      <input
-        type="url"
-        name="target_url"
-        required
-        value="{{ webhook.target_url }}"
-        class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
-      />
+      <input type="url" name="target_url" required value="{{ webhook.target_url }}" class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400" />
     </label>
 
     <label class="grid gap-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
       Trigger Every (seconds)
-      <input
-        type="number"
-        name="interval_seconds"
-        min="1"
-        value="{{ webhook.interval_seconds }}"
-        required
-        class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
-      />
+      <input type="number" name="interval_seconds" min="1" value="{{ webhook.interval_seconds }}" required class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400" />
     </label>
 
     <input type="hidden" name="filter_method" value="{{ webhook.filter_method }}" data-edit-filter-method />
@@ -53,11 +35,7 @@
     <div class="rounded-xl border border-slate-700/80 bg-slate-900/70 p-3">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">Trigger Filters</p>
-        <button
-          type="button"
-          data-open-edit-filters
-          class="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:border-sky-400 hover:text-white"
-        >
+        <button type="button" data-open-edit-filters class="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:border-sky-400 hover:text-white">
           Configure
         </button>
       </div>
@@ -70,9 +48,21 @@
         name="payload_template"
         rows="14"
         required
+        data-edit-payload-template
         class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-100 outline-none transition focus:border-sky-400"
       >{{ webhook.payload_template }}</textarea>
     </label>
+
+    <div class="rounded-xl border border-slate-700/80 bg-slate-900/70 p-3">
+      <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">Insert variable</p>
+      <div class="mt-2 flex flex-wrap gap-2 text-xs">
+        <button type="button" data-insert-token="{{ '{{ scan.method | tojson }}' }}" class="rounded-lg border border-slate-600 px-2 py-1 font-mono text-slate-200 hover:border-slate-400">scan.method</button>
+        <button type="button" data-insert-token="{{ '{{ scan.path | tojson }}' }}" class="rounded-lg border border-slate-600 px-2 py-1 font-mono text-slate-200 hover:border-slate-400">scan.path</button>
+        <button type="button" data-insert-token="{{ '{{ scan.client_ip | tojson }}' }}" class="rounded-lg border border-slate-600 px-2 py-1 font-mono text-slate-200 hover:border-slate-400">scan.client_ip</button>
+        <button type="button" data-insert-token="{{ '{{ scan.body_size | tojson }}' }}" class="rounded-lg border border-slate-600 px-2 py-1 font-mono text-slate-200 hover:border-slate-400">scan.body_size</button>
+        <button type="button" data-insert-token="{{ '{{ now | tojson }}' }}" class="rounded-lg border border-slate-600 px-2 py-1 font-mono text-slate-200 hover:border-slate-400">now</button>
+      </div>
+    </div>
 
     <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-200">
       <input type="checkbox" name="enabled" {% if webhook.enabled %}checked{% endif %} class="h-4 w-4 rounded border-slate-600 bg-slate-800 text-sky-500" />
@@ -80,24 +70,16 @@
     </label>
 
     <div class="flex flex-wrap items-center gap-3">
-      <button
-        type="button"
-        data-preview-edit-webhook
-        class="rounded-xl border border-emerald-400/70 bg-emerald-400/20 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-400/30"
-      >
+      <button type="button" data-validate-edit-webhook-template class="rounded-xl border border-violet-400/70 bg-violet-400/20 px-4 py-2 text-sm font-semibold text-violet-300 transition hover:bg-violet-400/30">
+        Validate Template
+      </button>
+      <button type="button" data-preview-edit-webhook class="rounded-xl border border-emerald-400/70 bg-emerald-400/20 px-4 py-2 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-400/30">
         Preview Payload
       </button>
-      <button
-        type="button"
-        data-test-edit-webhook
-        class="rounded-xl border border-amber-400/70 bg-amber-400/20 px-4 py-2 text-sm font-semibold text-amber-300 transition hover:bg-amber-400/30"
-      >
+      <button type="button" data-test-edit-webhook class="rounded-xl border border-amber-400/70 bg-amber-400/20 px-4 py-2 text-sm font-semibold text-amber-300 transition hover:bg-amber-400/30">
         Test
       </button>
-      <button
-        type="submit"
-        class="rounded-xl border border-sky-400/70 bg-sky-400/20 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-400/30"
-      >
+      <button type="submit" class="rounded-xl border border-sky-400/70 bg-sky-400/20 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-400/30">
         Save Changes
       </button>
     </div>
@@ -125,11 +107,9 @@
 
   <div class="mt-6 rounded-xl border border-rose-500/50 bg-rose-500/10 p-4">
     <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-rose-200">Danger Zone</h2>
-    <form method="post" action="/webhooks/{{ webhook.id }}/delete" class="mt-3">
-      <button
-        type="submit"
-        class="rounded-xl border border-rose-400/70 bg-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/30"
-      >
+    <form method="post" action="/webhooks/{{ webhook.id }}/delete" class="mt-3" onsubmit="return confirm('Delete this webhook permanently?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <button type="submit" class="rounded-xl border border-rose-400/70 bg-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/30">
         Delete Webhook
       </button>
     </form>
@@ -137,9 +117,16 @@
 </section>
 
 <div data-edit-filter-modal class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-950/80 p-4">
-  <div class="w-full max-w-xl rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl shadow-black/40">
+  <div
+    data-edit-filter-panel
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="edit-filter-title"
+    tabindex="-1"
+    class="w-full max-w-xl rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl shadow-black/40"
+  >
     <div class="flex items-center justify-between gap-3">
-      <h3 class="text-lg font-semibold text-white">Configure Trigger Filters</h3>
+      <h3 id="edit-filter-title" class="text-lg font-semibold text-white">Configure Trigger Filters</h3>
       <button type="button" data-close-edit-filters class="rounded-lg border border-slate-600 px-2 py-1 text-xs font-semibold text-slate-200 hover:border-slate-300">Close</button>
     </div>
 
@@ -214,13 +201,16 @@
 <script>
   (function () {
     const modal = document.querySelector('[data-edit-filter-modal]');
-    if (!modal) {
+    const modalPanel = document.querySelector('[data-edit-filter-panel]');
+    if (!modal || !modalPanel) {
       return;
     }
 
     const form = document.querySelector('[data-edit-webhook-form]');
+    const payloadTemplate = document.querySelector('[data-edit-payload-template]');
     const previewButton = document.querySelector('[data-preview-edit-webhook]');
     const testButton = document.querySelector('[data-test-edit-webhook]');
+    const validateButton = document.querySelector('[data-validate-edit-webhook-template]');
     const testResult = document.querySelector('[data-edit-test-result]');
     const previewPanel = document.querySelector('[data-edit-preview-panel]');
     const previewMeta = document.querySelector('[data-edit-preview-meta]');
@@ -279,11 +269,13 @@
       if (!testResult) {
         return;
       }
-      testResult.classList.remove('hidden', 'border-emerald-400/50', 'bg-emerald-500/10', 'text-emerald-300', 'border-rose-400/50', 'bg-rose-500/10', 'text-rose-300', 'border-amber-400/50', 'bg-amber-500/10', 'text-amber-300');
+      testResult.classList.remove('hidden', 'border-emerald-400/50', 'bg-emerald-500/10', 'text-emerald-300', 'border-rose-400/50', 'bg-rose-500/10', 'text-rose-300', 'border-amber-400/50', 'bg-amber-500/10', 'text-amber-300', 'border-violet-400/50', 'bg-violet-500/10', 'text-violet-300');
       if (type === 'success') {
         testResult.classList.add('border-emerald-400/50', 'bg-emerald-500/10', 'text-emerald-300');
       } else if (type === 'info') {
         testResult.classList.add('border-amber-400/50', 'bg-amber-500/10', 'text-amber-300');
+      } else if (type === 'validation') {
+        testResult.classList.add('border-violet-400/50', 'bg-violet-500/10', 'text-violet-300');
       } else {
         testResult.classList.add('border-rose-400/50', 'bg-rose-500/10', 'text-rose-300');
       }
@@ -300,7 +292,7 @@
       previewJson.textContent = JSON.stringify(result.payload, null, 2);
     }
 
-    function openModal() {
+    function syncModalFromHidden() {
       modalMethod.value = hiddenMethod.value;
       modalBodySize.checked = hiddenBodySize.value === 'on';
       modalBurstEnabled.checked = Number(hiddenBurstPackets.value) > 0 && Number(hiddenBurstWindow.value) > 0;
@@ -309,17 +301,16 @@
       modalField.value = hiddenField.value;
       modalOperator.value = hiddenOperator.value || 'equals';
       modalValue.value = hiddenValue.value;
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
     }
 
-    function closeModal() {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-    }
+    const modalControl = window.setupAccessibleModal({
+      modal,
+      panel: modalPanel,
+      openButton: document.querySelector('[data-open-edit-filters]'),
+      closeButtons: [...modal.querySelectorAll('[data-close-edit-filters]')],
+      onOpen: syncModalFromHidden,
+    });
 
-    document.querySelector('[data-open-edit-filters]').addEventListener('click', openModal);
-    modal.querySelectorAll('[data-close-edit-filters]').forEach((node) => node.addEventListener('click', closeModal));
     document.querySelector('[data-save-edit-filters]').addEventListener('click', () => {
       hiddenMethod.value = modalMethod.value;
       hiddenBodySize.value = modalBodySize.checked ? 'on' : 'off';
@@ -334,8 +325,44 @@
       hiddenOperator.value = modalOperator.value;
       hiddenValue.value = modalValue.value;
       refreshSummary();
-      closeModal();
+      modalControl.close();
     });
+
+    if (payloadTemplate) {
+      document.querySelectorAll('[data-insert-token]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const token = button.dataset.insertToken || '';
+          const start = payloadTemplate.selectionStart ?? payloadTemplate.value.length;
+          const end = payloadTemplate.selectionEnd ?? payloadTemplate.value.length;
+          payloadTemplate.setRangeText(token, start, end, 'end');
+          payloadTemplate.focus();
+        });
+      });
+    }
+
+    if (form && validateButton) {
+      validateButton.addEventListener('click', async () => {
+        setTestResult('info', 'Validating template…');
+        validateButton.disabled = true;
+        try {
+          const payload = new FormData(form);
+          const response = await fetch('/webhooks/validate-template', {
+            method: 'POST',
+            body: payload,
+          });
+          const data = await response.json();
+          if (response.ok && data.ok) {
+            setTestResult('validation', data.message || 'Template is valid.');
+          } else {
+            setTestResult('error', data.message || 'Template validation failed.');
+          }
+        } catch (_error) {
+          setTestResult('error', 'Validation failed due to a network or server error.');
+        } finally {
+          validateButton.disabled = false;
+        }
+      });
+    }
 
     if (form && testButton) {
       testButton.addEventListener('click', async () => {

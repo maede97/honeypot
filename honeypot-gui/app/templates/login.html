@@ -28,23 +28,37 @@
       {% endif %}
 
       <form method="post" action="/login" class="mt-5 grid gap-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <label class="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
           Username
           <input
             type="text"
             name="username"
             required
+            autofocus
+            autocomplete="username"
             class="rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
           />
         </label>
         <label class="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">
           Password
-          <input
-            type="password"
-            name="password"
-            required
-            class="rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
-          />
+          <div class="relative">
+            <input
+              type="password"
+              name="password"
+              required
+              autocomplete="current-password"
+              data-password-input
+              class="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 pr-20 text-sm text-slate-100 outline-none transition focus:border-sky-400"
+            />
+            <button
+              type="button"
+              data-toggle-password
+              class="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg border border-slate-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-200 transition hover:border-slate-300"
+            >
+              Show
+            </button>
+          </div>
         </label>
         <button
           type="submit"
@@ -55,5 +69,16 @@
       </form>
       </section>
     </main>
+    <script>
+      const passwordInput = document.querySelector('[data-password-input]');
+      const toggleButton = document.querySelector('[data-toggle-password]');
+      if (passwordInput && toggleButton) {
+        toggleButton.addEventListener('click', () => {
+          const showing = passwordInput.type === 'text';
+          passwordInput.type = showing ? 'password' : 'text';
+          toggleButton.textContent = showing ? 'Show' : 'Hide';
+        });
+      }
+    </script>
   </body>
 </html>

@@ -1,8 +1,10 @@
 import asyncio
+import secrets
 import os
 import re
 import ipaddress
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 from functools import wraps
 
 import bcrypt
@@ -116,6 +118,64 @@ def login_required(handler):
         return await handler(*args, **kwargs)
 
     return wrapped
+
+
+def _ensure_csrf_token(request: Request) -> str:
+    token = request.session.get("csrf_token")
+    if isinstance(token, str) and token:
+        return token
+    token = secrets.token_urlsafe(32)
+    request.session["csrf_token"] = token
+    return token
+
+
+def _require_csrf(request: Request, submitted_token: str) -> None:
+    expected = request.session.get("csrf_token")
+    if not isinstance(expected, str) or not expected:
+        raise HTTPException(status_code=403, detail="Missing CSRF session token")
+    if not submitted_token or not secrets.compare_digest(expected, submitted_token):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+
+
+def _template_response(request: Request, name: str, context: dict, status_code: int = 200):
+    merged = {"csrf_token": _ensure_csrf_token(request), **context}
+    return templates.TemplateResponse(
+        request=request,
+        name=name,
+        context=merged,
+        status_code=status_code,
+    )
+
+
+def _normalize_scan_timestamp(raw_value: str) -> tuple[str, str]:
+    text = raw_value.strip()
+    if not text:
+        return "", ""
+
+    parsed: datetime | None = None
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        parsed = None
+
+    if parsed is None and len(text) == 16:
+        try:
+            parsed = datetime.strptime(text, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            parsed = None
+
+    if parsed is None:
+        return text, ""
+
+    normalized = parsed.replace(microsecond=0).isoformat(timespec="seconds")
+    local_input = parsed.strftime("%Y-%m-%dT%H:%M")
+    return normalized, local_input
+
+
+def _preset_from_hours(hours_back: int) -> tuple[str, str]:
+    now = datetime.utcnow().replace(microsecond=0)
+    start = now - timedelta(hours=hours_back)
+    return start.isoformat(timespec="seconds"), now.isoformat(timespec="seconds")
 
 
 def _verify_password(submitted_password: str) -> bool:
@@ -333,11 +393,7 @@ def healthz() -> dict[str, str]:
 def login_page(request: Request):
     if _is_authenticated(request):
         return RedirectResponse(url="/", status_code=303)
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={"error": None},
-    )
+    return _template_response(request, "login.html", {"error": None})
 
 
 @app.post("/login")
@@ -345,14 +401,11 @@ def login_submit(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
+    csrf_token: str = Form(...),
 ):
+    _require_csrf(request, csrf_token)
     if username != GUI_ADMIN_USERNAME or not _verify_password(password):
-        return templates.TemplateResponse(
-            request=request,
-            name="login.html",
-            context={"error": "Invalid credentials"},
-            status_code=401,
-        )
+        return _template_response(request, "login.html", {"error": "Invalid credentials"}, status_code=401)
 
     request.session["authenticated"] = True
     request.session["username"] = username
@@ -360,7 +413,8 @@ def login_submit(
 
 
 @app.post("/logout")
-def logout(request: Request):
+def logout(request: Request, csrf_token: str = Form(...)):
+    _require_csrf(request, csrf_token)
     request.session.clear()
     return RedirectResponse(url="/login", status_code=303)
 
@@ -368,10 +422,10 @@ def logout(request: Request):
 @app.get("/")
 @login_required
 async def dashboard(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="dashboard.html",
-        context={
+    return _template_response(
+        request,
+        "dashboard.html",
+        {
             "method_colors": _load_method_colors(),
             "heatmap_colors": _load_heatmap_colors(),
             "heatmap_thresholds": _load_heatmap_thresholds(),
@@ -383,26 +437,11 @@ async def dashboard(request: Request):
 @login_required
 async def settings_page(request: Request, msg: str = Query(default="")):
     webhooks = _webhook_store.list_webhooks()
-    preview_by_webhook = {
-        webhook.id: _db.list_matching_scans(
-            method_filter=webhook.filter_method,
-            body_size_gt_zero=webhook.body_size_gt_zero,
-            burst_packets=webhook.burst_packets,
-            burst_window_seconds=webhook.burst_window_seconds,
-            field_filter=webhook.filter_field,
-            operator_filter=webhook.filter_operator,
-            value_filter=webhook.filter_value,
-            limit=8,
-        )
-        for webhook in webhooks
-    }
-
-    return templates.TemplateResponse(
-        request=request,
-        name="webhooks.html",
-        context={
+    return _template_response(
+        request,
+        "webhooks.html",
+        {
             "webhooks": webhooks,
-            "preview_by_webhook": preview_by_webhook,
             "message": msg,
             "method_colors": _load_method_colors(),
             "heatmap_colors": _load_heatmap_colors(),
@@ -427,6 +466,7 @@ async def scans(
     to_ts: str = Query(default=""),
     sort_by: str = Query(default="ts"),
     sort_dir: str = Query(default="desc"),
+    range_filter: str = Query(default="", alias="range"),
 ):
     method = method.upper().strip()
     if method and method not in {"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "PROPFIND", "CONNECT"}:
@@ -441,23 +481,34 @@ async def scans(
     if sort_dir not in {"asc", "desc"}:
         sort_dir = "desc"
 
+    from_ts_value, from_ts_local = _normalize_scan_timestamp(from_ts)
+    to_ts_value, to_ts_local = _normalize_scan_timestamp(to_ts)
+    quick_range = range_filter.strip().lower()
+    if quick_range in {"1h", "24h", "7d"}:
+        hours = {"1h": 1, "24h": 24, "7d": 168}[quick_range]
+        from_ts_value, to_ts_value = _preset_from_hours(hours)
+        from_ts_local = datetime.fromisoformat(from_ts_value).strftime("%Y-%m-%dT%H:%M")
+        to_ts_local = datetime.fromisoformat(to_ts_value).strftime("%Y-%m-%dT%H:%M")
+    else:
+        quick_range = ""
+
     rows, total = _db.list_scans(
         page=page,
         page_size=page_size,
         path_filter=path.strip(),
         ip_filter=ip.strip(),
         method_filter=method,
-        from_ts=from_ts.strip(),
-        to_ts=to_ts.strip(),
+        from_ts=from_ts_value,
+        to_ts=to_ts_value,
         sort_by=sort_by,
         sort_dir=sort_dir,
     )
 
     pages = max((total + page_size - 1) // page_size, 1)
-    return templates.TemplateResponse(
-        request=request,
-        name="scans.html",
-        context={
+    return _template_response(
+        request,
+        "scans.html",
+        {
             "rows": rows,
             "total": total,
             "page": page,
@@ -467,9 +518,12 @@ async def scans(
                 "path": path,
                 "ip": ip,
                 "method": method,
-                "from_ts": from_ts,
-                "to_ts": to_ts,
+                "from_ts": from_ts_value,
+                "to_ts": to_ts_value,
+                "from_ts_local": from_ts_local,
+                "to_ts_local": to_ts_local,
             },
+            "active_range": quick_range,
             "sort": {
                 "by": sort_by,
                 "dir": sort_dir,
@@ -485,11 +539,7 @@ async def scan_detail(request: Request, scan_id: int):
     if scan is None:
         raise HTTPException(status_code=404, detail="Scan not found")
 
-    return templates.TemplateResponse(
-        request=request,
-        name="scan_detail.html",
-        context={"scan": scan},
-    )
+    return _template_response(request, "scan_detail.html", {"scan": scan})
 
 
 @app.get("/ips")
@@ -540,10 +590,10 @@ async def ips_page(
                 }
             )
 
-    return templates.TemplateResponse(
-        request=request,
-        name="ips.html",
-        context={
+    return _template_response(
+        request,
+        "ips.html",
+        {
             "rows": enriched_rows,
             "total": total,
             "page": page,
@@ -564,6 +614,27 @@ async def stats_api(request: Request):
     return JSONResponse(content=_db.dashboard_stats())
 
 
+@app.get("/api/webhooks/{webhook_id}/matches")
+@login_required
+async def webhook_matches_api(request: Request, webhook_id: int):
+    _ = request
+    webhook = _webhook_store.get_webhook(webhook_id)
+    if webhook is None:
+        raise HTTPException(status_code=404, detail="Webhook not found")
+
+    rows = _db.list_matching_scans(
+        method_filter=webhook.filter_method,
+        body_size_gt_zero=webhook.body_size_gt_zero,
+        burst_packets=webhook.burst_packets,
+        burst_window_seconds=webhook.burst_window_seconds,
+        field_filter=webhook.filter_field,
+        operator_filter=webhook.filter_operator,
+        value_filter=webhook.filter_value,
+        limit=12,
+    )
+    return JSONResponse(content={"ok": True, "rows": rows})
+
+
 @app.get("/webhooks")
 @login_required
 async def webhooks_page(request: Request):
@@ -575,6 +646,7 @@ async def webhooks_page(request: Request):
 @login_required
 async def settings_method_colors(
     request: Request,
+    csrf_token: str = Form(...),
     get_color: str = Form(default=""),
     post_color: str = Form(default=""),
     put_color: str = Form(default=""),
@@ -583,7 +655,7 @@ async def settings_method_colors(
     head_color: str = Form(default=""),
     options_color: str = Form(default=""),
 ):
-    _ = request
+    _require_csrf(request, csrf_token)
     submitted = {
         "GET": get_color,
         "POST": post_color,
@@ -605,6 +677,7 @@ async def settings_method_colors(
 @login_required
 async def settings_heatmap_colors(
     request: Request,
+    csrf_token: str = Form(...),
     zero_color: str = Form(default=""),
     low_color: str = Form(default=""),
     medium_color: str = Form(default=""),
@@ -614,7 +687,7 @@ async def settings_heatmap_colors(
     medium_max: str = Form(default=""),
     high_max: str = Form(default=""),
 ):
-    _ = request
+    _require_csrf(request, csrf_token)
     submitted = {
         "ZERO": zero_color,
         "LOW": low_color,
@@ -646,6 +719,7 @@ async def settings_heatmap_colors(
 @login_required
 async def webhooks_create(
     request: Request,
+    csrf_token: str = Form(...),
     name: str = Form(...),
     target_url: str = Form(...),
     interval_seconds: int = Form(...),
@@ -659,7 +733,7 @@ async def webhooks_create(
     payload_template: str = Form(...),
     enabled: str | None = Form(default=None),
 ):
-    _ = request
+    _require_csrf(request, csrf_token)
 
     interval_clean = _validate_webhook_interval(interval_seconds)
     payload_clean = _validate_webhook_payload_template(payload_template)
@@ -695,6 +769,7 @@ async def webhooks_create(
 @login_required
 async def webhooks_test(
     request: Request,
+    csrf_token: str = Form(...),
     name: str = Form(...),
     target_url: str = Form(...),
     filter_method: str = Form(default=""),
@@ -706,7 +781,7 @@ async def webhooks_test(
     filter_value: str = Form(default=""),
     payload_template: str = Form(...),
 ):
-    _ = request
+    _require_csrf(request, csrf_token)
 
     payload_clean = _validate_webhook_payload_template(payload_template)
     method_clean, body_size_clean, burst_packets_clean, burst_window_clean, field_clean, operator_clean, value_clean = _normalize_webhook_filter(
@@ -739,6 +814,7 @@ async def webhooks_test(
 @login_required
 async def webhooks_preview(
     request: Request,
+    csrf_token: str = Form(...),
     name: str = Form(...),
     filter_method: str = Form(default=""),
     body_size_gt_zero: str = Form(default="off"),
@@ -749,7 +825,7 @@ async def webhooks_preview(
     filter_value: str = Form(default=""),
     payload_template: str = Form(...),
 ):
-    _ = request
+    _require_csrf(request, csrf_token)
 
     payload_clean = _validate_webhook_payload_template(payload_template)
     method_clean, body_size_clean, burst_packets_clean, burst_window_clean, field_clean, operator_clean, value_clean = _normalize_webhook_filter(
@@ -777,6 +853,24 @@ async def webhooks_preview(
     return JSONResponse(content=result, status_code=status)
 
 
+@app.post("/webhooks/validate-template")
+@login_required
+async def webhooks_validate_template(
+    request: Request,
+    csrf_token: str = Form(...),
+    name: str = Form(...),
+    payload_template: str = Form(...),
+):
+    _require_csrf(request, csrf_token)
+    payload_clean = _validate_webhook_payload_template(payload_template)
+    result = _webhook_dispatcher.validate_payload_template(
+        name=name.strip() or "Webhook",
+        payload_template=payload_clean,
+    )
+    status = 200 if result.get("ok") else 400
+    return JSONResponse(content=result, status_code=status)
+
+
 @app.get("/webhooks/{webhook_id}/edit")
 @login_required
 async def webhook_edit_page(request: Request, webhook_id: int):
@@ -784,10 +878,10 @@ async def webhook_edit_page(request: Request, webhook_id: int):
     if webhook is None:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
-    return templates.TemplateResponse(
-        request=request,
-        name="webhook_edit.html",
-        context={
+    return _template_response(
+        request,
+        "webhook_edit.html",
+        {
             "webhook": webhook,
             "filter_fields": WEBHOOK_FILTER_FIELDS,
             "filter_methods": WEBHOOK_METHODS,
@@ -811,6 +905,7 @@ async def webhook_edit_page(request: Request, webhook_id: int):
 async def webhook_edit_submit(
     request: Request,
     webhook_id: int,
+    csrf_token: str = Form(...),
     name: str = Form(...),
     target_url: str = Form(...),
     interval_seconds: int = Form(...),
@@ -824,7 +919,7 @@ async def webhook_edit_submit(
     payload_template: str = Form(...),
     enabled: str | None = Form(default=None),
 ):
-    _ = request
+    _require_csrf(request, csrf_token)
 
     interval_clean = _validate_webhook_interval(interval_seconds)
     payload_clean = _validate_webhook_payload_template(payload_template)
@@ -861,8 +956,8 @@ async def webhook_edit_submit(
 
 @app.post("/webhooks/{webhook_id}/delete")
 @login_required
-async def webhook_delete(request: Request, webhook_id: int):
-    _ = request
+async def webhook_delete(request: Request, webhook_id: int, csrf_token: str = Form(...)):
+    _require_csrf(request, csrf_token)
     deleted = _webhook_store.delete_webhook(webhook_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Webhook not found")
