@@ -39,6 +39,24 @@
       </select>
     </label>
     <label class="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300"
+      >Header text
+      <input
+        type="text"
+        name="header_text"
+        value="{{ filters.header_text }}"
+        class="w-full min-w-0 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
+      />
+    </label>
+    <label class="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300"
+      >Body text
+      <input
+        type="text"
+        name="body_text"
+        value="{{ filters.body_text }}"
+        class="w-full min-w-0 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 outline-none transition focus:border-sky-400"
+      />
+    </label>
+    <label class="grid min-w-0 gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300"
       >From
       <input
         type="datetime-local"
@@ -85,13 +103,15 @@
       </div>
     </div>
   </form>
-  {% set has_active_filters = filters.path or filters.ip or filters.method or filters.from_ts or filters.to_ts %}
+  {% set has_active_filters = filters.path or filters.ip or filters.method or filters.header_text or filters.body_text or filters.from_ts or filters.to_ts %}
   {% if has_active_filters %}
   <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-200">
     <span class="font-semibold uppercase tracking-[0.14em] text-slate-300">Active</span>
     {% if filters.path %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">path={{ filters.path }}</span>{% endif %}
     {% if filters.ip %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">ip={{ filters.ip }}</span>{% endif %}
     {% if filters.method %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">method={{ filters.method }}</span>{% endif %}
+    {% if filters.header_text %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">header_text={{ filters.header_text }}</span>{% endif %}
+    {% if filters.body_text %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">body_text={{ filters.body_text }}</span>{% endif %}
     {% if filters.from_ts %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">from={{ filters.from_ts }}</span>{% endif %}
     {% if filters.to_ts %}<span class="rounded-full border border-slate-600 px-2.5 py-1 font-mono">to={{ filters.to_ts }}</span>{% endif %}
   </div>
@@ -115,7 +135,7 @@
     <div>
       {% if page > 1 %}
       <a
-        href="/scans?page={{ prev_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
+        href="/scans?page={{ prev_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&header_text={{ filters.header_text }}&body_text={{ filters.body_text }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
         class="inline-flex rounded-lg border border-slate-600 px-3 py-1.5 font-semibold text-slate-100 transition hover:border-sky-400"
         >Previous</a
       >
@@ -125,7 +145,7 @@
     <div class="text-right">
       {% if page < pages %}
       <a
-        href="/scans?page={{ next_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
+        href="/scans?page={{ next_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&header_text={{ filters.header_text }}&body_text={{ filters.body_text }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
         class="inline-flex rounded-lg border border-slate-600 px-3 py-1.5 font-semibold text-slate-100 transition hover:border-sky-400"
         >Next</a
       >
@@ -138,7 +158,7 @@
       <thead class="sticky top-0 z-10 bg-slate-800 text-left text-xs uppercase tracking-[0.16em] text-slate-300">
         <tr>
           <th class="w-[88px] px-3 py-3 whitespace-nowrap">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ts&sort_dir={{ time_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&header_text={{ filters.header_text }}&body_text={{ filters.body_text }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ts&sort_dir={{ time_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Time</span>
               {% if sort.by == 'ts' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -148,7 +168,7 @@
             </a>
           </th>
           <th class="w-[74px] px-2 py-3 whitespace-nowrap">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=method&sort_dir={{ method_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&header_text={{ filters.header_text }}&body_text={{ filters.body_text }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=method&sort_dir={{ method_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Method</span>
               {% if sort.by == 'method' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -158,7 +178,7 @@
             </a>
           </th>
           <th class="min-w-[220px] px-3 py-3">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=path&sort_dir={{ path_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&header_text={{ filters.header_text }}&body_text={{ filters.body_text }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=path&sort_dir={{ path_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Path</span>
               {% if sort.by == 'path' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -168,7 +188,7 @@
             </a>
           </th>
           <th class="px-4 py-3 whitespace-nowrap">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ip&sort_dir={{ ip_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&header_text={{ filters.header_text }}&body_text={{ filters.body_text }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ip&sort_dir={{ ip_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>IP</span>
               {% if sort.by == 'ip' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -178,7 +198,7 @@
             </a>
           </th>
           <th class="px-4 py-3">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ua&sort_dir={{ ua_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&header_text={{ filters.header_text }}&body_text={{ filters.body_text }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=ua&sort_dir={{ ua_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>User Agent</span>
               {% if sort.by == 'ua' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -188,7 +208,7 @@
             </a>
           </th>
           <th class="w-[74px] px-2 py-3 whitespace-nowrap">
-            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=body&sort_dir={{ body_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
+            <a href="/scans?page=1&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&header_text={{ filters.header_text }}&body_text={{ filters.body_text }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by=body&sort_dir={{ body_sort_dir }}&range={{ active_range }}" class="inline-flex items-center gap-1 transition hover:text-slate-100">
               <span>Body</span>
               {% if sort.by == 'body' %}
               <span class="text-sky-300">{{ '▲' if sort.dir == 'asc' else '▼' }}</span>
@@ -274,7 +294,7 @@
     <div>
       {% if page > 1 %}
       <a
-        href="/scans?page={{ prev_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
+        href="/scans?page={{ prev_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&header_text={{ filters.header_text }}&body_text={{ filters.body_text }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
         class="inline-flex rounded-lg border border-slate-600 px-3 py-1.5 font-semibold text-slate-100 transition hover:border-sky-400"
         >Previous</a
       >
@@ -284,7 +304,7 @@
     <div class="text-right">
       {% if page < pages %}
       <a
-        href="/scans?page={{ next_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
+        href="/scans?page={{ next_page }}&page_size={{ page_size }}&path={{ filters.path }}&ip={{ filters.ip }}&method={{ filters.method }}&header_text={{ filters.header_text }}&body_text={{ filters.body_text }}&from_ts={{ filters.from_ts }}&to_ts={{ filters.to_ts }}&sort_by={{ sort.by }}&sort_dir={{ sort.dir }}&range={{ active_range }}"
         class="inline-flex rounded-lg border border-slate-600 px-3 py-1.5 font-semibold text-slate-100 transition hover:border-sky-400"
         >Next</a
       >

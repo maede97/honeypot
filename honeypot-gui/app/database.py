@@ -43,6 +43,8 @@ class Database:
         path_filter: str,
         ip_filter: str,
         method_filter: str,
+        header_filter: str,
+        body_filter: str,
         from_ts: str,
         to_ts: str,
         sort_by: str,
@@ -60,6 +62,12 @@ class Database:
         if method_filter:
             where.append("method = ?")
             params.append(method_filter.upper())
+        if header_filter:
+            where.append("COALESCE(headers_json, '') LIKE ?")
+            params.append(f"%{header_filter}%")
+        if body_filter:
+            where.append("COALESCE(body_text, '') LIKE ?")
+            params.append(f"%{body_filter}%")
         if from_ts:
             where.append("ts >= ?")
             params.append(from_ts)
