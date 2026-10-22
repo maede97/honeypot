@@ -32,12 +32,23 @@ class Database:
                 """
             )
 
-            self._conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_scans_ts ON scans(ts);"
-            )
-            self._conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_scans_path ON scans(path);"
-            )
+            legacy_index_statements = [
+                "CREATE INDEX IF NOT EXISTS idx_scans_ts ON scans(ts);",
+                "CREATE INDEX IF NOT EXISTS idx_scans_path ON scans(path);",
+            ]
+            for statement in legacy_index_statements:
+                self._conn.execute(statement)
+
+            index_statements = [
+                "CREATE INDEX IF NOT EXISTS idx_scans_method ON scans(method);",
+                "CREATE INDEX IF NOT EXISTS idx_scans_client_ip ON scans(client_ip);",
+                "CREATE INDEX IF NOT EXISTS idx_scans_ts_id ON scans(ts, id);",
+                "CREATE INDEX IF NOT EXISTS idx_scans_method_ts_id ON scans(method, ts DESC, id DESC);",
+                "CREATE INDEX IF NOT EXISTS idx_scans_path_ts_id ON scans(path, ts DESC, id DESC);",
+                "CREATE INDEX IF NOT EXISTS idx_scans_client_ip_ts_id ON scans(client_ip, ts, id);",
+            ]
+            for statement in index_statements:
+                self._conn.execute(statement)
 
             scan_columns = self._conn.execute("PRAGMA table_info(scans);").fetchall()
             has_body_text = any(str(row["name"]) == "body_text" for row in scan_columns)
@@ -59,6 +70,8 @@ class Database:
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_scan_daily_method_day ON scan_daily_method_counts(day);"
             )
+            self._conn.execute("ANALYZE scans;")
+            self._conn.execute("ANALYZE scan_daily_method_counts;")
             self._conn.commit()
 
     def log_scan(
